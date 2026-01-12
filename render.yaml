@@ -1,0 +1,45 @@
+# Render Blueprint
+# https://render.com/docs/blueprint-spec
+
+services:
+  # Frontend Mini App (Telegram WebApp)
+  - type: web
+    name: apple-cheaper-app
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+
+  # Admin Panel
+  - type: web
+    name: apple-cheaper-admin
+    env: static
+    buildCommand: cd admin && npm install && npm run build
+    staticPublishPath: admin/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_SUPABASE_SERVICE_ROLE_KEY
+        sync: false

@@ -1,0 +1,28 @@
+{
+  "name": "apple-cheaper",
+  "version": "1.0.0",
+  "description": "Apple Cheaper - Telegram Mini App for online store",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "admin"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:admin\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:admin": "npm run dev --workspace=admin",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:admin": "npm run build --workspace=admin",
+    "start": "npm run start --workspace=backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
