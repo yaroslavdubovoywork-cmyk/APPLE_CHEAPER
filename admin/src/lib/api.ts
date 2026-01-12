@@ -215,11 +215,11 @@ export const productsApi = {
     const { data, error } = await supabase
       .from('products')
       .insert(insertData)
-      .select()
-      .single();
+      .select();
     
     if (error) throw error;
-    return data;
+    if (!data || data.length === 0) throw new Error('Failed to create product');
+    return data[0];
   },
   
   update: async (id: string, product: Partial<Product>) => {
@@ -243,11 +243,11 @@ export const productsApi = {
       .from('products')
       .update(updateData)
       .eq('id', id)
-      .select()
-      .single();
+      .select();
     
     if (error) throw error;
-    return data;
+    if (!data || data.length === 0) throw new Error('Product not found');
+    return data[0];
   },
   
   delete: async (id: string) => {
