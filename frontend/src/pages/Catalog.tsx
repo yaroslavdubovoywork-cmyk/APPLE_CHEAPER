@@ -107,17 +107,20 @@ export default function Catalog() {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
   
   // Fetch brands from database
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
-    queryFn: () => brandsApi.getAll()
+    queryFn: () => brandsApi.getAll(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
   
   // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
-    queryFn: () => categoriesApi.getAll()
+    queryFn: () => categoriesApi.getAll(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
   
   // Fetch products
@@ -134,7 +137,8 @@ export default function Catalog() {
       page,
       limit: 20,
       currency
-    })
+    }),
+    staleTime: 2 * 60 * 1000, // 2 minutes - keep products fresh longer
   });
   
   const pagination = productsData?.pagination;
@@ -157,10 +161,14 @@ export default function Catalog() {
     }
   }, [productsData, page]);
   
-  // Reset page and products when filters change
+  // Reset page and products when filters change (but not on initial mount)
   useEffect(() => {
-    setPage(1);
-    setAllProducts([]);
+    if (filtersInitialized) {
+      setPage(1);
+      setAllProducts([]);
+    } else {
+      setFiltersInitialized(true);
+    }
   }, [selectedBrand, selectedCategory, searchQuery]);
   
   // Get featured product (first one with image)
