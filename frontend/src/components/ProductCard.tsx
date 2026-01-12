@@ -52,10 +52,10 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         className="group block"
       >
         {/* Card Container */}
-        <div className="relative rounded-[28px] bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 px-4 pt-24 pb-4 min-h-[180px]">
+        <div className="relative rounded-[28px] bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 px-3 pt-20 pb-3 min-h-[160px]">
           
           {/* Product Image - FLOATING ABOVE THE CARD */}
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[90%] h-36 z-10 pointer-events-none">
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[85%] h-32 z-10 pointer-events-none">
             <img
               src={product.image_url || getPlaceholderImage(name.slice(0, 2))}
               alt={name}
@@ -75,30 +75,30 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
           {/* Bottom Info */}
           <div className="relative z-10">
             {/* Product Name & Category */}
-            <div className="mb-2">
-              <h3 className="font-semibold text-[15px] text-zinc-900 dark:text-white leading-tight line-clamp-2">
+            <div className="mb-1">
+              <h3 className="font-semibold text-[14px] text-zinc-900 dark:text-white leading-tight line-clamp-2">
                 {name}
               </h3>
               {product.category && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                   {getLocalizedText(product.category.name, product.category.name_en, i18n.language)}
                 </p>
               )}
             </div>
             
             {/* Price & Buttons Row */}
-            <div className="flex items-center justify-between">
-              <p className="font-bold text-lg text-zinc-900 dark:text-white">
+            <div className="flex items-center justify-between gap-1">
+              <p className="font-bold text-[15px] text-zinc-900 dark:text-white whitespace-nowrap">
                 {formatPrice(product.price, currency)}
               </p>
               
               {/* Action Buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {/* Favorite Button */}
                 <button
                   onClick={handleToggleFavorite}
                   className={cn(
-                    "flex items-center justify-center w-10 h-10 rounded-full",
+                    "flex items-center justify-center w-9 h-9 rounded-full",
                     "transition-all duration-300 ease-out active:scale-90",
                     favorite 
                       ? "bg-red-500 text-white" 
@@ -107,7 +107,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
                   aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
                 >
                   <svg
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                     fill={favorite ? "currentColor" : "none"}
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -126,7 +126,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
                   <button
                     onClick={handleAddToCart}
                     className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded-full",
+                      "flex items-center justify-center w-9 h-9 rounded-full",
                       "transition-all duration-300 ease-out active:scale-90",
                       inCart
                         ? "bg-black text-white dark:bg-white dark:text-black"
@@ -135,11 +135,11 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
                     aria-label={inCart ? t('product.inCart') : t('product.addToCart')}
                   >
                     {inCart ? (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                       </svg>
                     )}
