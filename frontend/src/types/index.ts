@@ -46,9 +46,18 @@ export interface PriceHistoryItem {
 }
 
 // Cart types
+export interface CartItemVariant {
+  id: string;
+  color_name: string;
+  color_name_en?: string;
+  color_hex: string;
+  image_url: string | null;
+}
+
 export interface CartItem {
   product: Product;
   quantity: number;
+  variant?: CartItemVariant; // Selected color variant
 }
 
 // Order types

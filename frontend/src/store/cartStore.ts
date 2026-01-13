@@ -1,23 +1,27 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Product, CartItem, Currency } from '../types';
+import { Product, CartItem, Currency, CartItemVariant } from '../types';
+
+// Helper to generate unique cart item key
+const getCartItemKey = (productId: string, variantId?: string) => 
+  variantId ? `${productId}_${variantId}` : productId;
 
 interface CartState {
   items: CartItem[];
   currency: Currency;
   
   // Actions
-  addItem: (product: Product, quantity?: number) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (product: Product, quantity?: number, variant?: CartItemVariant) => void;
+  removeItem: (productId: string, variantId?: string) => void;
+  updateQuantity: (productId: string, quantity: number, variantId?: string) => void;
   clearCart: () => void;
   setCurrency: (currency: Currency) => void;
   
   // Computed
   getTotal: () => number;
   getItemCount: () => number;
-  isInCart: (productId: string) => boolean;
-  getItemQuantity: (productId: string) => number;
+  isInCart: (productId: string, variantId?: string) => boolean;
+  getItemQuantity: (productId: string, variantId?: string) => number;
 }
 
 export const useCartStore = create<CartState>()(
@@ -26,40 +30,49 @@ export const useCartStore = create<CartState>()(
       items: [],
       currency: 'RUB',
       
-      addItem: (product: Product, quantity: number = 1) => {
+      addItem: (product: Product, quantity: number = 1, variant?: CartItemVariant) => {
         const { items } = get();
-        const existingItem = items.find(item => item.product.id === product.id);
+        const itemKey = getCartItemKey(product.id, variant?.id);
+        const existingItem = items.find(item => 
+          getCartItemKey(item.product.id, item.variant?.id) === itemKey
+        );
         
         if (existingItem) {
           set({
             items: items.map(item =>
-              item.product.id === product.id
+              getCartItemKey(item.product.id, item.variant?.id) === itemKey
                 ? { ...item, quantity: item.quantity + quantity }
                 : item
             )
           });
         } else {
-          set({ items: [...items, { product, quantity }] });
+          set({ items: [...items, { product, quantity, variant }] });
         }
         
         // Haptic feedback
         window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light');
       },
       
-      removeItem: (productId: string) => {
-        set({ items: get().items.filter(item => item.product.id !== productId) });
+      removeItem: (productId: string, variantId?: string) => {
+        const itemKey = getCartItemKey(productId, variantId);
+        set({ 
+          items: get().items.filter(item => 
+            getCartItemKey(item.product.id, item.variant?.id) !== itemKey
+          ) 
+        });
         window.Telegram?.WebApp?.HapticFeedback?.impactOccurred('light');
       },
       
-      updateQuantity: (productId: string, quantity: number) => {
+      updateQuantity: (productId: string, quantity: number, variantId?: string) => {
         if (quantity <= 0) {
-          get().removeItem(productId);
+          get().removeItem(productId, variantId);
           return;
         }
         
+        const itemKey = getCartItemKey(productId, variantId);
         set({
           items: get().items.map(item =>
-            item.product.id === productId
+            getCartItemKey(item.product.id, item.variant?.id) === itemKey
               ? { ...item, quantity }
               : item
           )
@@ -86,12 +99,18 @@ export const useCartStore = create<CartState>()(
         return get().items.reduce((count, item) => count + item.quantity, 0);
       },
       
-      isInCart: (productId: string) => {
-        return get().items.some(item => item.product.id === productId);
+      isInCart: (productId: string, variantId?: string) => {
+        const itemKey = getCartItemKey(productId, variantId);
+        return get().items.some(item => 
+          getCartItemKey(item.product.id, item.variant?.id) === itemKey
+        );
       },
       
-      getItemQuantity: (productId: string) => {
-        const item = get().items.find(item => item.product.id === productId);
+      getItemQuantity: (productId: string, variantId?: string) => {
+        const itemKey = getCartItemKey(productId, variantId);
+        const item = get().items.find(item => 
+          getCartItemKey(item.product.id, item.variant?.id) === itemKey
+        );
         return item?.quantity || 0;
       }
     }),

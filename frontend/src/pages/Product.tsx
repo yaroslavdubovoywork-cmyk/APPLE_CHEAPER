@@ -81,8 +81,6 @@ export default function Product() {
   
   const name = getLocalizedText(product.name, product.name_en, i18n.language);
   const description = getLocalizedText(product.description, product.description_en, i18n.language);
-  const inCart = isInCart(product.id);
-  const quantity = getItemQuantity(product.id);
   const favorite = isFavorite(product.id);
   const inStock = product.stock === null || product.stock > 0;
   const categoryName = product.category 
@@ -93,6 +91,14 @@ export default function Product() {
   const hasVariants = product.variants && product.variants.length > 0;
   const currentImage = selectedVariant?.image_url || product.image_url;
   
+  // Cart state - use variant ID if has variants
+  const variantId = selectedVariant?.id;
+  const inCart = isInCart(product.id, variantId);
+  const quantity = getItemQuantity(product.id, variantId);
+  
+  // Can add to cart only if: in stock AND (no variants OR variant selected)
+  const canAddToCart = inStock && (!hasVariants || selectedVariant !== null);
+  
   // Check if description is long
   const isLongDescription = description && description.length > 120;
   const displayDescription = showFullDescription || !isLongDescription
@@ -100,8 +106,17 @@ export default function Product() {
     : description?.slice(0, 120) + '...';
   
   const handleAddToCart = () => {
-    if (inStock) {
-      addItem(product);
+    if (canAddToCart) {
+      // Create variant info for cart if variant selected
+      const cartVariant = selectedVariant ? {
+        id: selectedVariant.id,
+        color_name: selectedVariant.color_name,
+        color_name_en: selectedVariant.color_name_en,
+        color_hex: selectedVariant.color_hex,
+        image_url: selectedVariant.image_url
+      } : undefined;
+      
+      addItem(product, 1, cartVariant);
       haptic('success');
       analyticsApi.trackEvent({
         event_type: 'add_to_cart',
@@ -388,9 +403,9 @@ export default function Product() {
                   whileTap={{ scale: 0.9 }}
                   onClick={() => {
                     if (quantity > 1) {
-                      updateQuantity(product.id, quantity - 1);
+                      updateQuantity(product.id, quantity - 1, variantId);
                     } else {
-                      removeItem(product.id);
+                      removeItem(product.id, variantId);
                     }
                     haptic('light');
                   }}
@@ -421,7 +436,7 @@ export default function Product() {
                 <motion.button
                   whileTap={{ scale: 0.9 }}
                   onClick={() => {
-                    updateQuantity(product.id, quantity + 1);
+                    updateQuantity(product.id, quantity + 1, variantId);
                     haptic('light');
                   }}
                   className="w-11 h-11 rounded-xl bg-zinc-900 dark:bg-white flex items-center justify-center text-white dark:text-zinc-900 shadow-sm active:opacity-80 transition-opacity"
@@ -441,23 +456,30 @@ export default function Product() {
                 transition={{ duration: 0.2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleAddToCart}
-                disabled={!inStock}
+                disabled={!canAddToCart}
                 className={cn(
                   "flex-1 h-14 rounded-2xl font-semibold text-base transition-all duration-200 flex items-center justify-center gap-2",
-                  inStock
+                  canAddToCart
                     ? "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900"
                     : "bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
                 )}
               >
-                {inStock ? (
+                {!inStock ? (
+                  t('product.outOfStock')
+                ) : hasVariants && !selectedVariant ? (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                    </svg>
+                    {i18n.language === 'ru' ? 'Выберите цвет' : 'Select color'}
+                  </>
+                ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     {t('product.addToCart')}
                   </>
-                ) : (
-                  t('product.outOfStock')
                 )}
               </motion.button>
             )}

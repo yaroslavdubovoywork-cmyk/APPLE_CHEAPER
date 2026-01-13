@@ -17,21 +17,30 @@ export const CartItem = memo(function CartItem({ item, index = 0 }: CartItemProp
   
   const name = getLocalizedText(item.product.name, item.product.name_en, i18n.language);
   const total = item.product.price * item.quantity;
+  const variantId = item.variant?.id;
+  
+  // Use variant image if available, otherwise product image
+  const imageUrl = item.variant?.image_url || item.product.image_url;
+  
+  // Get variant color name
+  const colorName = item.variant 
+    ? getLocalizedText(item.variant.color_name, item.variant.color_name_en, i18n.language)
+    : null;
   
   const handleIncrement = () => {
-    updateQuantity(item.product.id, item.quantity + 1);
+    updateQuantity(item.product.id, item.quantity + 1, variantId);
   };
   
   const handleDecrement = () => {
     if (item.quantity > 1) {
-      updateQuantity(item.product.id, item.quantity - 1);
+      updateQuantity(item.product.id, item.quantity - 1, variantId);
     } else {
-      removeItem(item.product.id);
+      removeItem(item.product.id, variantId);
     }
   };
   
   const handleRemove = () => {
-    removeItem(item.product.id);
+    removeItem(item.product.id, variantId);
   };
   
   return (
@@ -43,14 +52,22 @@ export const CartItem = memo(function CartItem({ item, index = 0 }: CartItemProp
       className="flex gap-4 py-4 border-b border-[var(--tg-theme-hint-color)]/20 last:border-0"
     >
       {/* Product Image */}
-      <Link to={`/product/${item.product.id}`} className="shrink-0">
+      <Link to={`/product/${item.product.id}`} className="shrink-0 relative">
         <div className="w-20 h-20 rounded-xl overflow-hidden bg-[var(--tg-theme-secondary-bg-color)]">
           <img
-            src={item.product.image_url || getPlaceholderImage(name.slice(0, 2), 160)}
+            src={imageUrl || getPlaceholderImage(name.slice(0, 2), 160)}
             alt={name}
             className="w-full h-full object-cover"
           />
         </div>
+        {/* Color indicator */}
+        {item.variant && (
+          <div 
+            className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white dark:border-zinc-900 shadow-sm"
+            style={{ backgroundColor: item.variant.color_hex }}
+            title={colorName || ''}
+          />
+        )}
       </Link>
       
       {/* Product Info */}
@@ -60,6 +77,17 @@ export const CartItem = memo(function CartItem({ item, index = 0 }: CartItemProp
             {name}
           </h3>
         </Link>
+        
+        {/* Color name */}
+        {colorName && (
+          <p className="text-xs text-[var(--tg-theme-hint-color)] mb-1 flex items-center gap-1">
+            <span 
+              className="w-2.5 h-2.5 rounded-full inline-block"
+              style={{ backgroundColor: item.variant?.color_hex }}
+            />
+            {colorName}
+          </p>
+        )}
         
         <p className="text-sm text-[var(--tg-theme-hint-color)] mb-2">
           {formatPrice(item.product.price, currency)}
