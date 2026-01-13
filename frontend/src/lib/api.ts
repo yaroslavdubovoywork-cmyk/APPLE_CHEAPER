@@ -111,12 +111,19 @@ export const productsApi = {
       .from('products')
       .select(`
         *,
-        category:categories(id, name, name_en, slug)
+        category:categories(id, name, name_en, slug),
+        variants:product_variants(id, color_name, color_name_en, color_hex, image_url, sort_order)
       `)
       .eq('id', id)
       .single();
     
     if (error) throw error;
+    
+    // Sort variants by sort_order
+    if (data.variants) {
+      data.variants.sort((a: any, b: any) => a.sort_order - b.sort_order);
+    }
+    
     return data;
   }
 };

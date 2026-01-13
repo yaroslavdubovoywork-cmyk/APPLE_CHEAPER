@@ -9,6 +9,16 @@ export interface Category {
   children?: Category[];
 }
 
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  color_name: string;
+  color_name_en?: string;
+  color_hex: string;
+  image_url: string | null;
+  sort_order: number;
+}
+
 export interface Product {
   id: string;
   article: string;
@@ -27,6 +37,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   price_history?: PriceHistoryItem[];
+  variants?: ProductVariant[];
 }
 
 export interface PriceHistoryItem {

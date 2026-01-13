@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Package, Upload, X } from 'lucide-react';
-import { productsApi, categoriesApi, uploadApi } from '@/lib/api';
+import { Plus, Search, Edit, Trash2, Package, Upload, X, Palette } from 'lucide-react';
+import { productsApi, categoriesApi, uploadApi, variantsApi, ProductVariant } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,14 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatPrice, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
+
+interface ColorVariant {
+  id?: string;
+  color_name: string;
+  color_name_en: string;
+  color_hex: string;
+  image_url: string;
+}
 
 interface ProductFormData {
   article: string;
@@ -48,6 +56,8 @@ export default function Products() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
   const [uploading, setUploading] = useState(false);
+  const [colorVariants, setColorVariants] = useState<ColorVariant[]>([]);
+  const [uploadingVariantIndex, setUploadingVariantIndex] = useState<number | null>(null);
   
   // Fetch products
   const { data: productsData, isLoading } = useQuery({
@@ -93,7 +103,7 @@ export default function Products() {
     onError: (error: Error) => toast.error(error.message)
   });
   
-  const openModal = (product?: any) => {
+  const openModal = async (product?: any) => {
     if (product) {
       setEditingProduct(product);
       setFormData({
@@ -109,9 +119,23 @@ export default function Products() {
         stock: product.stock,
         is_active: product.is_active
       });
+      // Load variants
+      try {
+        const variants = await variantsApi.getByProductId(product.id);
+        setColorVariants(variants.map(v => ({
+          id: v.id,
+          color_name: v.color_name,
+          color_name_en: v.color_name_en || '',
+          color_hex: v.color_hex,
+          image_url: v.image_url || ''
+        })));
+      } catch {
+        setColorVariants([]);
+      }
     } else {
       setEditingProduct(null);
       setFormData(initialFormData);
+      setColorVariants([]);
     }
     setShowModal(true);
   };
@@ -120,9 +144,10 @@ export default function Products() {
     setShowModal(false);
     setEditingProduct(null);
     setFormData(initialFormData);
+    setColorVariants([]);
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.article || !formData.name || !formData.price || !formData.category_id) {
@@ -144,10 +169,36 @@ export default function Products() {
       is_active: formData.is_active
     };
     
-    if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, data });
-    } else {
-      createMutation.mutate(data);
+    try {
+      let productId = editingProduct?.id;
+      
+      if (editingProduct) {
+        await productsApi.update(editingProduct.id, data);
+      } else {
+        const newProduct = await productsApi.create(data);
+        productId = newProduct.id;
+      }
+      
+      // Save variants if product ID exists
+      if (productId && colorVariants.length > 0) {
+        const validVariants = colorVariants.filter(v => v.color_name && v.color_hex);
+        await variantsApi.batchUpdate(productId, validVariants.map((v, index) => ({
+          color_name: v.color_name,
+          color_name_en: v.color_name_en,
+          color_hex: v.color_hex,
+          image_url: v.image_url,
+          sort_order: index
+        })));
+      } else if (productId) {
+        // Clear variants if empty
+        await variantsApi.batchUpdate(productId, []);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(editingProduct ? 'Товар обновлён' : 'Товар создан');
+      closeModal();
+    } catch (error: any) {
+      toast.error(error.message || 'Ошибка сохранения');
     }
   };
   
@@ -205,6 +256,52 @@ export default function Products() {
   
   const removeImage = () => {
     setFormData(prev => ({ ...prev, image_url: '' }));
+  };
+  
+  // Color variant management
+  const addColorVariant = () => {
+    setColorVariants(prev => [...prev, {
+      color_name: '',
+      color_name_en: '',
+      color_hex: '#000000',
+      image_url: ''
+    }]);
+  };
+  
+  const removeColorVariant = (index: number) => {
+    setColorVariants(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const updateColorVariant = (index: number, field: keyof ColorVariant, value: string) => {
+    setColorVariants(prev => prev.map((v, i) => 
+      i === index ? { ...v, [field]: value } : v
+    ));
+  };
+  
+  const handleVariantImageUpload = async (file: File, index: number) => {
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Выберите изображение');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Размер файла не должен превышать 5MB');
+      return;
+    }
+    
+    setUploadingVariantIndex(index);
+    try {
+      const { url } = await uploadApi.uploadImage(file);
+      updateColorVariant(index, 'image_url', url);
+      toast.success('Изображение загружено');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Ошибка загрузки изображения');
+    } finally {
+      setUploadingVariantIndex(null);
+    }
   };
   
   const handleDelete = async (id: string) => {
@@ -521,6 +618,143 @@ export default function Products() {
                       className="text-sm"
                     />
                   </div>
+                </div>
+                
+                {/* Color Variants */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Palette className="w-5 h-5 text-muted-foreground" />
+                      <label className="text-sm font-medium">Цветовые варианты</label>
+                      <span className="text-xs text-muted-foreground">(опционально)</span>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      onClick={addColorVariant}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Добавить цвет
+                    </Button>
+                  </div>
+                  
+                  {colorVariants.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4 bg-muted/50 rounded-lg">
+                      Цветовые варианты не добавлены. Будет использоваться основное изображение.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {colorVariants.map((variant, index) => (
+                        <div key={index} className="flex gap-3 items-start p-4 border rounded-xl bg-muted/30">
+                          {/* Color Preview */}
+                          <div className="shrink-0">
+                            <div 
+                              className="w-12 h-12 rounded-full border-2 border-white shadow-md cursor-pointer"
+                              style={{ backgroundColor: variant.color_hex }}
+                              title={variant.color_name || 'Цвет'}
+                            />
+                            <input
+                              type="color"
+                              value={variant.color_hex}
+                              onChange={(e) => updateColorVariant(index, 'color_hex', e.target.value)}
+                              className="sr-only"
+                              id={`color-picker-${index}`}
+                            />
+                            <label 
+                              htmlFor={`color-picker-${index}`}
+                              className="text-xs text-muted-foreground cursor-pointer block text-center mt-1"
+                            >
+                              Выбрать
+                            </label>
+                          </div>
+                          
+                          {/* Fields */}
+                          <div className="flex-1 space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                placeholder="Название цвета (RU)"
+                                value={variant.color_name}
+                                onChange={(e) => updateColorVariant(index, 'color_name', e.target.value)}
+                                className="text-sm"
+                              />
+                              <Input
+                                placeholder="Color name (EN)"
+                                value={variant.color_name_en}
+                                onChange={(e) => updateColorVariant(index, 'color_name_en', e.target.value)}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <Input
+                                placeholder="HEX код"
+                                value={variant.color_hex}
+                                onChange={(e) => updateColorVariant(index, 'color_hex', e.target.value)}
+                                className="text-sm w-28"
+                              />
+                              <div className="flex-1">
+                                {variant.image_url ? (
+                                  <div className="flex items-center gap-2">
+                                    <img 
+                                      src={variant.image_url} 
+                                      alt="" 
+                                      className="w-10 h-10 object-cover rounded border"
+                                    />
+                                    <Input
+                                      value={variant.image_url}
+                                      onChange={(e) => updateColorVariant(index, 'image_url', e.target.value)}
+                                      placeholder="URL изображения"
+                                      className="text-sm flex-1"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => updateColorVariant(index, 'image_url', '')}
+                                      className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <label className={cn(
+                                    "flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors",
+                                    uploadingVariantIndex === index && "opacity-50 pointer-events-none"
+                                  )}>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleVariantImageUpload(file, index);
+                                      }}
+                                      className="hidden"
+                                      disabled={uploadingVariantIndex === index}
+                                    />
+                                    {uploadingVariantIndex === index ? (
+                                      <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full" />
+                                    ) : (
+                                      <Upload className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                    <span className="text-sm text-muted-foreground">
+                                      {uploadingVariantIndex === index ? 'Загрузка...' : 'Загрузить фото'}
+                                    </span>
+                                  </label>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Remove */}
+                          <button
+                            type="button"
+                            onClick={() => removeColorVariant(index)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex gap-4 pt-4">

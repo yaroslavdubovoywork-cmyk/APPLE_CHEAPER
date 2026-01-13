@@ -1,6 +1,16 @@
 import { supabase } from './supabase';
 
 // Types
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  color_name: string;
+  color_name_en?: string;
+  color_hex: string;
+  image_url?: string;
+  sort_order: number;
+}
+
 export interface Product {
   id: string;
   article: string;
@@ -17,6 +27,7 @@ export interface Product {
   created_at: string;
   updated_at: string;
   category?: Category;
+  variants?: ProductVariant[];
 }
 
 export interface Category {
@@ -187,12 +198,19 @@ export const productsApi = {
       .from('products')
       .select(`
         *,
-        category:categories(id, name, name_en, slug)
+        category:categories(id, name, name_en, slug),
+        variants:product_variants(id, color_name, color_name_en, color_hex, image_url, sort_order)
       `)
       .eq('id', id)
       .single();
     
     if (error) throw error;
+    
+    // Sort variants
+    if (data.variants) {
+      data.variants.sort((a: ProductVariant, b: ProductVariant) => a.sort_order - b.sort_order);
+    }
+    
     return data;
   },
   
@@ -277,6 +295,95 @@ export const productsApi = {
     }
     
     return results;
+  }
+};
+
+// Product Variants API
+export const variantsApi = {
+  getByProductId: async (productId: string): Promise<ProductVariant[]> => {
+    const { data, error } = await supabase
+      .from('product_variants')
+      .select('*')
+      .eq('product_id', productId)
+      .order('sort_order');
+    
+    if (error) throw error;
+    return data || [];
+  },
+  
+  create: async (variant: Omit<ProductVariant, 'id'>): Promise<ProductVariant> => {
+    const { data, error } = await supabase
+      .from('product_variants')
+      .insert({
+        product_id: variant.product_id,
+        color_name: variant.color_name,
+        color_name_en: variant.color_name_en,
+        color_hex: variant.color_hex,
+        image_url: variant.image_url,
+        sort_order: variant.sort_order
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+  
+  update: async (id: string, variant: Partial<ProductVariant>): Promise<ProductVariant> => {
+    const { data, error } = await supabase
+      .from('product_variants')
+      .update({
+        color_name: variant.color_name,
+        color_name_en: variant.color_name_en,
+        color_hex: variant.color_hex,
+        image_url: variant.image_url,
+        sort_order: variant.sort_order,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+  
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('product_variants')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+  
+  // Batch update for a product - deletes old and inserts new
+  batchUpdate: async (productId: string, variants: Array<Omit<ProductVariant, 'id' | 'product_id'>>): Promise<ProductVariant[]> => {
+    // Delete existing variants
+    await supabase
+      .from('product_variants')
+      .delete()
+      .eq('product_id', productId);
+    
+    if (variants.length === 0) return [];
+    
+    // Insert new variants
+    const { data, error } = await supabase
+      .from('product_variants')
+      .insert(
+        variants.map((v, index) => ({
+          product_id: productId,
+          color_name: v.color_name,
+          color_name_en: v.color_name_en,
+          color_hex: v.color_hex,
+          image_url: v.image_url,
+          sort_order: v.sort_order ?? index
+        }))
+      )
+      .select();
+    
+    if (error) throw error;
+    return data || [];
   }
 };
 

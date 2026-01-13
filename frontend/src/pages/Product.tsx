@@ -9,6 +9,18 @@ import { useFavoritesStore } from '../store/favoritesStore';
 import { useTelegram } from '../hooks/useTelegram';
 import { Loading } from '../components/Loading';
 import { formatPrice, getLocalizedText, cn, getPlaceholderImage } from '../lib/utils';
+import { ProductVariant } from '../types';
+
+// Helper to determine if a color is light (for checkmark contrast)
+function isLightColor(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  // Calculate luminance
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6;
+}
 
 export default function Product() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +32,7 @@ export default function Product() {
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
   
   // Setup back button
   useEffect(() => {
@@ -75,6 +88,10 @@ export default function Product() {
   const categoryName = product.category 
     ? getLocalizedText(product.category.name, product.category.name_en, i18n.language)
     : product.brand || '';
+  
+  // Color variants
+  const hasVariants = product.variants && product.variants.length > 0;
+  const currentImage = selectedVariant?.image_url || product.image_url;
   
   // Check if description is long
   const isLongDescription = description && description.length > 120;
@@ -138,14 +155,21 @@ export default function Product() {
           className="relative z-10 pt-16 px-8 pb-4"
         >
           <div className="relative aspect-square max-w-[320px] mx-auto">
-            <img
-              src={product.image_url || getPlaceholderImage(name.slice(0, 2), 800)}
-              alt={name}
-              className="w-full h-full object-contain drop-shadow-2xl"
-              style={{
-                filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.25))',
-              }}
-            />
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={currentImage || 'placeholder'}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3 }}
+                src={currentImage || getPlaceholderImage(name.slice(0, 2), 800)}
+                alt={name}
+                className="w-full h-full object-contain drop-shadow-2xl"
+                style={{
+                  filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.25))',
+                }}
+              />
+            </AnimatePresence>
             
             {/* Out of Stock Badge */}
             {!inStock && (
@@ -196,6 +220,82 @@ export default function Product() {
             )}
           </div>
         </div>
+        
+        {/* Color Selector */}
+        {hasVariants && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 tracking-wide uppercase">
+                {i18n.language === 'ru' ? 'Цвет' : 'Color'}
+              </p>
+              <AnimatePresence mode="wait">
+                {selectedVariant && (
+                  <motion.span
+                    key={selectedVariant.id}
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                  >
+                    {getLocalizedText(selectedVariant.color_name, selectedVariant.color_name_en, i18n.language)}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {product.variants!.map((variant) => (
+                <motion.button
+                  key={variant.id}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    setSelectedVariant(selectedVariant?.id === variant.id ? null : variant);
+                    haptic('light');
+                  }}
+                  className={cn(
+                    "relative w-12 h-12 rounded-full transition-all duration-200",
+                    "ring-2 ring-offset-2 ring-offset-white dark:ring-offset-zinc-800",
+                    selectedVariant?.id === variant.id
+                      ? "ring-zinc-900 dark:ring-white scale-110"
+                      : "ring-transparent hover:ring-zinc-300 dark:hover:ring-zinc-600"
+                  )}
+                  style={{ backgroundColor: variant.color_hex }}
+                  title={getLocalizedText(variant.color_name, variant.color_name_en, i18n.language)}
+                >
+                  {/* Checkmark for selected */}
+                  <AnimatePresence>
+                    {selectedVariant?.id === variant.id && (
+                      <motion.div
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center"
+                      >
+                        <svg 
+                          className={cn(
+                            "w-5 h-5",
+                            // Use white checkmark for dark colors, black for light
+                            isLightColor(variant.color_hex) ? "text-zinc-900" : "text-white"
+                          )}
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor" 
+                          strokeWidth={3}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  
+                  {/* Border for white/light colors */}
+                  {isLightColor(variant.color_hex) && (
+                    <div className="absolute inset-0 rounded-full border border-zinc-300 dark:border-zinc-600" />
+                  )}
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Description */}
         {description && (
