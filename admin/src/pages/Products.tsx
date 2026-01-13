@@ -17,6 +17,7 @@ interface ColorVariant {
   color_name_en: string;
   color_hex: string;
   image_url: string;
+  price: number | null; // Optional price override
 }
 
 interface ProductFormData {
@@ -127,7 +128,8 @@ export default function Products() {
           color_name: v.color_name,
           color_name_en: v.color_name_en || '',
           color_hex: v.color_hex,
-          image_url: v.image_url || ''
+          image_url: v.image_url || '',
+          price: v.price ?? null
         })));
       } catch {
         setColorVariants([]);
@@ -187,6 +189,7 @@ export default function Products() {
           color_name_en: v.color_name_en,
           color_hex: v.color_hex,
           image_url: v.image_url,
+          price: v.price,
           sort_order: index
         })));
       } else if (productId) {
@@ -264,7 +267,8 @@ export default function Products() {
       color_name: '',
       color_name_en: '',
       color_hex: '#000000',
-      image_url: ''
+      image_url: '',
+      price: null
     }]);
   };
   
@@ -272,7 +276,7 @@ export default function Products() {
     setColorVariants(prev => prev.filter((_, i) => i !== index));
   };
   
-  const updateColorVariant = (index: number, field: keyof ColorVariant, value: string) => {
+  const updateColorVariant = (index: number, field: keyof ColorVariant, value: string | number | null) => {
     setColorVariants(prev => prev.map((v, i) => 
       i === index ? { ...v, [field]: value } : v
     ));
@@ -690,6 +694,13 @@ export default function Products() {
                                 placeholder="HEX код"
                                 value={variant.color_hex}
                                 onChange={(e) => updateColorVariant(index, 'color_hex', e.target.value)}
+                                className="text-sm w-28"
+                              />
+                              <Input
+                                type="number"
+                                placeholder="Цена (опц.)"
+                                value={variant.price ?? ''}
+                                onChange={(e) => updateColorVariant(index, 'price', e.target.value ? Number(e.target.value) : null)}
                                 className="text-sm w-28"
                               />
                               <div className="flex-1">

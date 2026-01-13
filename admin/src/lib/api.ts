@@ -8,6 +8,7 @@ export interface ProductVariant {
   color_name_en?: string;
   color_hex: string;
   image_url?: string;
+  price?: number | null;
   sort_order: number;
 }
 
@@ -320,6 +321,7 @@ export const variantsApi = {
         color_name_en: variant.color_name_en,
         color_hex: variant.color_hex,
         image_url: variant.image_url,
+        price: variant.price,
         sort_order: variant.sort_order
       })
       .select()
@@ -337,6 +339,7 @@ export const variantsApi = {
         color_name_en: variant.color_name_en,
         color_hex: variant.color_hex,
         image_url: variant.image_url,
+        price: variant.price,
         sort_order: variant.sort_order,
         updated_at: new Date().toISOString()
       })
@@ -377,6 +380,7 @@ export const variantsApi = {
           color_name_en: v.color_name_en,
           color_hex: v.color_hex,
           image_url: v.image_url,
+          price: v.price,
           sort_order: v.sort_order ?? index
         }))
       )
