@@ -18,7 +18,7 @@ function App() {
   const location = useLocation();
   
   // Pages where BottomNav should be hidden
-  const hideBottomNav = location.pathname.startsWith('/product/') || location.pathname === '/checkout';
+  const hideBottomNav = location.pathname === '/checkout';
   
   // Apply color scheme
   useEffect(() => {

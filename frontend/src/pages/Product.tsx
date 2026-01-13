@@ -236,50 +236,12 @@ export default function Product() {
         )}
         
         {/* Article */}
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-5">
           {t('product.article')}: {product.article}
         </p>
-      </motion.div>
-      
-      {/* Price History (if exists) */}
-      <AnimatePresence>
-        {product.price_history && product.price_history.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="mx-4 mt-4 bg-white dark:bg-zinc-900 rounded-[24px] shadow-lg p-5"
-          >
-            <h2 className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-3">
-              {t('product.priceHistory')}
-            </h2>
-            <div className="space-y-2">
-              {product.price_history.slice(0, 3).map((item, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between items-center py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0"
-                >
-                  <span className="text-sm text-zinc-500">
-                    {new Date(item.created_at).toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : 'en-US')}
-                  </span>
-                  <span className="font-semibold text-zinc-900 dark:text-white">
-                    {formatPrice(item.price, 'RUB')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Bottom Action Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.3 }}
-        className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl border-t border-zinc-200/50 dark:border-zinc-800/50 safe-area-bottom"
-      >
-        <div className="flex items-center gap-3 max-w-lg mx-auto">
+        
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
           {/* Favorite Button */}
           <motion.button
             whileTap={{ scale: 0.9 }}
@@ -343,6 +305,38 @@ export default function Product() {
           </motion.button>
         </div>
       </motion.div>
+      
+      {/* Price History (if exists) */}
+      <AnimatePresence>
+        {product.price_history && product.price_history.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mx-4 mt-4 bg-white dark:bg-zinc-900 rounded-[24px] shadow-lg p-5"
+          >
+            <h2 className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-3">
+              {t('product.priceHistory')}
+            </h2>
+            <div className="space-y-2">
+              {product.price_history.slice(0, 3).map((item, index) => (
+                <div
+                  key={index}
+                  className="flex justify-between items-center py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0"
+                >
+                  <span className="text-sm text-zinc-500">
+                    {new Date(item.created_at).toLocaleDateString(i18n.language === 'ru' ? 'ru-RU' : 'en-US')}
+                  </span>
+                  <span className="font-semibold text-zinc-900 dark:text-white">
+                    {formatPrice(item.price, 'RUB')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
     </div>
   );
 }
