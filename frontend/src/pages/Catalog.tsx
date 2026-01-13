@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productsApi, categoriesApi, brandsApi, analyticsApi } from '../lib/api';
 import { useCartStore } from '../store/cartStore';
+import { useCatalogStore } from '../store/catalogStore';
 import { ProductCard } from '../components/ProductCard';
 import { CategoryNav } from '../components/CategoryNav';
 import { SearchInput } from '../components/SearchInput';
@@ -102,26 +103,38 @@ export default function Catalog() {
   const currency = useCartStore(state => state.currency);
   const { addItem } = useCartStore();
   
-  const [selectedBrand, setSelectedBrand] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [filtersInitialized, setFiltersInitialized] = useState(false);
+  // Use global catalog store instead of local state
+  const {
+    selectedBrand,
+    selectedCategory,
+    searchQuery,
+    page,
+    allProducts,
+    setSelectedBrand,
+    setSelectedCategory,
+    setSearchQuery,
+    setPage,
+    setAllProducts,
+    appendProducts,
+    resetFilters
+  } = useCatalogStore();
   
   // Fetch brands from database
   const { data: brands = [] } = useQuery({
     queryKey: ['brands'],
     queryFn: () => brandsApi.getAll(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
   
   // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesApi.getAll(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
+  
+  // Create query key for caching
+  const queryKey = `${selectedBrand}-${selectedCategory}-${searchQuery}-${page}`;
   
   // Fetch products
   const { 
@@ -138,38 +151,22 @@ export default function Catalog() {
       limit: 20,
       currency
     }),
-    staleTime: 2 * 60 * 1000, // 2 minutes - keep products fresh longer
+    staleTime: 2 * 60 * 1000,
   });
   
   const pagination = productsData?.pagination;
   
-  // Accumulate products when page changes
+  // Update products when data arrives
   useEffect(() => {
     const products = productsData?.products;
-    if (products) {
+    if (products && products.length > 0) {
       if (page === 1) {
-        // Reset when filters change (page resets to 1)
-        setAllProducts(products);
+        setAllProducts(products, queryKey);
       } else {
-        // Add new products to existing list
-        setAllProducts(prev => {
-          const existingIds = new Set(prev.map(p => p.id));
-          const newProducts = products.filter(p => !existingIds.has(p.id));
-          return [...prev, ...newProducts];
-        });
+        appendProducts(products);
       }
     }
-  }, [productsData, page]);
-  
-  // Reset page and products when filters change (but not on initial mount)
-  useEffect(() => {
-    if (filtersInitialized) {
-      setPage(1);
-      setAllProducts([]);
-    } else {
-      setFiltersInitialized(true);
-    }
-  }, [selectedBrand, selectedCategory, searchQuery]);
+  }, [productsData, page, queryKey, setAllProducts, appendProducts]);
   
   // Get featured product (first one with image)
   const featuredProduct = allProducts.find(p => p.image_url);
@@ -181,19 +178,27 @@ export default function Catalog() {
   
   const handleLoadMore = useCallback(() => {
     if (pagination && page < pagination.totalPages && !isFetching) {
-      setPage(prev => prev + 1);
+      setPage(page + 1);
     }
-  }, [pagination, page, isFetching]);
+  }, [pagination, page, isFetching, setPage]);
   
   const handleBrandSelect = useCallback((brand: string) => {
     setSelectedBrand(brand);
-  }, []);
+  }, [setSelectedBrand]);
   
   const handleCategorySelect = useCallback((categoryId: string | null) => {
     setSelectedCategory(categoryId);
-  }, []);
+  }, [setSelectedCategory]);
+  
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, [setSearchQuery]);
   
   const remainingCount = pagination ? pagination.total - allProducts.length : 0;
+  
+  // Show loading only on initial load when no products cached
+  const showLoading = isLoading && allProducts.length === 0;
+  const showEmpty = !isLoading && allProducts.length === 0 && productsData?.products?.length === 0;
   
   return (
     <div className="min-h-screen pb-28 bg-white dark:bg-zinc-950">
@@ -257,7 +262,7 @@ export default function Catalog() {
         >
           <SearchInput
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={handleSearchChange}
           />
         </motion.div>
         
@@ -280,10 +285,7 @@ export default function Catalog() {
               </span>
             )}
             <button 
-              onClick={() => {
-                setSelectedBrand('all');
-                setSelectedCategory(null);
-              }}
+              onClick={resetFilters}
               className="text-zinc-400 hover:text-zinc-600 ml-2"
             >
               ✕ Сбросить
@@ -291,13 +293,13 @@ export default function Catalog() {
           </motion.div>
         )}
         
-        {isLoading && allProducts.length === 0 ? (
+        {showLoading ? (
           <div className="grid grid-cols-2 gap-4">
             {[...Array(6)].map((_, i) => (
               <ProductCardSkeleton key={i} />
             ))}
           </div>
-        ) : allProducts.length === 0 ? (
+        ) : showEmpty ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
