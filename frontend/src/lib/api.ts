@@ -59,7 +59,8 @@ export const productsApi = {
       .from('products')
       .select(`
         *,
-        category:categories(id, name, name_en, slug)
+        category:categories(id, name, name_en, slug),
+        variants:product_variants(id, color_name, color_hex, price, sort_order)
       `, { count: 'exact' })
       .eq('is_active', true);
     
@@ -112,7 +113,7 @@ export const productsApi = {
       .select(`
         *,
         category:categories(id, name, name_en, slug),
-        variants:product_variants(id, color_name, color_name_en, color_hex, image_url, sort_order)
+        variants:product_variants(id, color_name, color_name_en, color_hex, image_url, price, sort_order)
       `)
       .eq('id', id)
       .single();

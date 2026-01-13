@@ -22,6 +22,22 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
   const favorite = isFavorite(product.id);
   const inStock = product.stock === null || product.stock > 0;
   
+  // Check if product has variants (show "from" prefix)
+  const hasVariants = product.variants && product.variants.length > 0;
+  
+  // Calculate min price from base price and variant prices
+  const getMinPrice = () => {
+    if (!hasVariants) return product.price;
+    const variantPrices = product.variants!
+      .map(v => v.price)
+      .filter((p): p is number => p !== null && p !== undefined);
+    if (variantPrices.length === 0) return product.price;
+    return Math.min(product.price, ...variantPrices);
+  };
+  
+  const displayPrice = getMinPrice();
+  const pricePrefix = hasVariants ? (i18n.language === 'ru' ? 'от ' : 'from ') : '';
+  
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -89,7 +105,8 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
             {/* Price & Buttons Row */}
             <div className="flex items-center justify-between gap-1">
               <p className="font-bold text-[15px] text-zinc-900 dark:text-white whitespace-nowrap">
-                {formatPrice(product.price, currency)}
+                <span className="font-normal text-[12px] text-zinc-500 dark:text-zinc-400">{pricePrefix}</span>
+                {formatPrice(displayPrice, currency)}
               </p>
               
               {/* Action Buttons */}

@@ -16,6 +16,7 @@ export interface ProductVariant {
   color_name_en?: string;
   color_hex: string;
   image_url: string | null;
+  price?: number | null; // Optional price override for this variant
   sort_order: number;
 }
 
