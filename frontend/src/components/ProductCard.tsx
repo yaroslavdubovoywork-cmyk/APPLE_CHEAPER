@@ -52,7 +52,7 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
         className="group block"
       >
         {/* Card Container */}
-        <div className="relative rounded-[28px] bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-800 dark:to-zinc-900 px-3 pt-20 pb-3 min-h-[160px]">
+        <div className="relative rounded-[28px] bg-gradient-to-b from-zinc-100 to-zinc-200 dark:from-zinc-700 dark:to-zinc-800 dark:border dark:border-zinc-600 px-3 pt-20 pb-3 min-h-[160px]">
           
           {/* Product Image - FLOATING ABOVE THE CARD */}
           <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-[85%] h-32 z-10 pointer-events-none">

@@ -67,7 +67,7 @@ function FeaturedBanner({ product, onAddToCart }: { product: Product; onAddToCar
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative rounded-[32px] overflow-hidden bg-gradient-to-br from-zinc-900 to-black p-6 mb-6"
+      className="relative rounded-[32px] overflow-hidden bg-gradient-to-br from-zinc-800 to-zinc-900 dark:from-zinc-700 dark:to-zinc-800 dark:border dark:border-zinc-600 p-6 mb-6"
     >
       <div className="flex items-center gap-4">
         <div className="flex-1">

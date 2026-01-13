@@ -168,7 +168,7 @@ export default function Product() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2, duration: 0.4 }}
-        className="relative z-20 -mt-8 mx-4 bg-white dark:bg-zinc-900 rounded-[32px] shadow-xl p-6"
+        className="relative z-20 -mt-8 mx-4 bg-white dark:bg-zinc-800 dark:border dark:border-zinc-700 rounded-[32px] shadow-xl p-6"
       >
         {/* Category / Brand */}
         <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-1">
@@ -313,7 +313,7 @@ export default function Product() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="mx-4 mt-4 bg-white dark:bg-zinc-900 rounded-[24px] shadow-lg p-5"
+            className="mx-4 mt-4 bg-white dark:bg-zinc-800 dark:border dark:border-zinc-700 rounded-[24px] shadow-lg p-5"
           >
             <h2 className="text-xs text-zinc-400 dark:text-zinc-500 uppercase tracking-wide mb-3">
               {t('product.priceHistory')}

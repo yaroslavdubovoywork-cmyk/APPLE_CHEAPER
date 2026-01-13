@@ -87,7 +87,7 @@ export const BottomNav = memo(function BottomNav() {
       )}
       
       {/* Nav Bar */}
-      <div className="mx-4 mb-4 rounded-[28px] bg-white dark:bg-zinc-900 shadow-2xl shadow-black/10 border border-zinc-200/50 dark:border-zinc-800">
+      <div className="mx-4 mb-4 rounded-[28px] bg-white dark:bg-zinc-800 shadow-2xl shadow-black/10 border border-zinc-200/50 dark:border-zinc-700">
         <div className="flex items-center justify-around py-3 px-2">
           {navItems.filter(item => !item.special || itemCount === 0).map((item) => (
             <NavLink
