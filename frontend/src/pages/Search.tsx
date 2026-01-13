@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productsApi, categoriesApi } from '../lib/api';
 import { ProductCard } from '../components/ProductCard';
-import { Loading, ProductCardSkeleton } from '../components/Loading';
+import { ProductCardSkeleton } from '../components/Loading';
 import { EmptyState, SearchIcon } from '../components/EmptyState';
 import { cn } from '../lib/utils';
 import { useCartStore } from '../store/cartStore';
@@ -48,7 +48,7 @@ function clearRecentSearches() {
 }
 
 export default function Search() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const { currency } = useCartStore();
   
@@ -74,9 +74,9 @@ export default function Search() {
   }, [query]);
   
   // Fetch categories
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
-    queryFn: categoriesApi.getAll
+    queryFn: () => categoriesApi.getAll()
   });
   
   // Fetch search results

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, Package, Upload, X, Palette } from 'lucide-react';
-import { productsApi, categoriesApi, uploadApi, variantsApi, ProductVariant } from '@/lib/api';
+import { productsApi, categoriesApi, uploadApi, variantsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
