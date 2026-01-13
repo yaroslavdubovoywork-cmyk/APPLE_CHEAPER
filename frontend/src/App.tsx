@@ -7,6 +7,7 @@ import { Loading } from './components/Loading';
 
 // Lazy load pages
 const Catalog = lazy(() => import('./pages/Catalog'));
+const Search = lazy(() => import('./pages/Search'));
 const Product = lazy(() => import('./pages/Product'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
@@ -34,6 +35,7 @@ function App() {
       <Suspense fallback={<Loading fullScreen />}>
         <Routes>
           <Route path="/" element={<Catalog />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/product/:id" element={<Product />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
