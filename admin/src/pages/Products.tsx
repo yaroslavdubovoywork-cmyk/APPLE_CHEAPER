@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, Package, Upload, X, Palette } from 'lucide-react';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { productsApi, categoriesApi, uploadApi, variantsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -651,27 +652,11 @@ export default function Products() {
                     <div className="space-y-4">
                       {colorVariants.map((variant, index) => (
                         <div key={index} className="flex gap-3 items-start p-4 border rounded-xl bg-muted/30">
-                          {/* Color Preview */}
-                          <div className="shrink-0">
-                            <div 
-                              className="w-12 h-12 rounded-full border-2 border-white shadow-md cursor-pointer"
-                              style={{ backgroundColor: variant.color_hex }}
-                              title={variant.color_name || 'Цвет'}
-                            />
-                            <input
-                              type="color"
-                              value={variant.color_hex}
-                              onChange={(e) => updateColorVariant(index, 'color_hex', e.target.value)}
-                              className="sr-only"
-                              id={`color-picker-${index}`}
-                            />
-                            <label 
-                              htmlFor={`color-picker-${index}`}
-                              className="text-xs text-muted-foreground cursor-pointer block text-center mt-1"
-                            >
-                              Выбрать
-                            </label>
-                          </div>
+                          {/* Color Picker */}
+                          <ColorPicker
+                            value={variant.color_hex}
+                            onChange={(color) => updateColorVariant(index, 'color_hex', color)}
+                          />
                           
                           {/* Fields */}
                           <div className="flex-1 space-y-2">
@@ -691,17 +676,11 @@ export default function Products() {
                             </div>
                             <div className="flex gap-2 items-center">
                               <Input
-                                placeholder="HEX код"
-                                value={variant.color_hex}
-                                onChange={(e) => updateColorVariant(index, 'color_hex', e.target.value)}
-                                className="text-sm w-28"
-                              />
-                              <Input
                                 type="number"
-                                placeholder="Цена (опц.)"
+                                placeholder="Цена (опционально)"
                                 value={variant.price ?? ''}
                                 onChange={(e) => updateColorVariant(index, 'price', e.target.value ? Number(e.target.value) : null)}
-                                className="text-sm w-28"
+                                className="text-sm w-36"
                               />
                               <div className="flex-1">
                                 {variant.image_url ? (
