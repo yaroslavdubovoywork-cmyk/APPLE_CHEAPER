@@ -25,9 +25,9 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        value: https://apple-cheaper-app.onrender.com
+        sync: false
       - key: ADMIN_URL
-        value: https://apple-cheaper-admin.onrender.com
+        sync: false
 
   # Frontend Mini App (Telegram WebApp)
   - type: web
@@ -49,7 +49,7 @@ services:
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
       - key: VITE_API_URL
-        value: https://apple-cheaper-backend.onrender.com/api
+        sync: false
 
   # Admin Panel
   - type: web
@@ -73,4 +73,4 @@ services:
       - key: VITE_SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: VITE_API_URL
-        value: https://apple-cheaper-backend.onrender.com/api
+        sync: false
