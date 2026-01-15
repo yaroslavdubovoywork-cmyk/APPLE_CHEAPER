@@ -389,13 +389,17 @@ export async function sendOrderStatusNotification(
   }
   
   const statusMessages: Record<string, string> = {
-    pending: '🕐 Ваш заказ принят и находится в обработке. Мы скоро свяжемся с вами!',
     confirmed: '✅ Ваш заказ подтверждён! Скоро мы свяжемся с вами для уточнения деталей.',
     processing: '📦 Ваш заказ обрабатывается.',
     shipped: '🚚 Ваш заказ отправлен! Ожидайте доставку.',
     delivered: '✨ Ваш заказ доставлен. Спасибо за покупку!',
     cancelled: '❌ К сожалению, ваш заказ был отменён. Свяжитесь с нами для уточнения причин.'
   };
+  
+  // For pending status, we use sendOrderConfirmationToCustomer instead
+  if (status === 'pending') {
+    return; // Will be handled separately with full order details
+  }
   
   const message = statusMessages[status];
   if (!message) return;
@@ -413,6 +417,67 @@ export async function sendOrderStatusNotification(
       });
   } catch (error) {
     console.error('Failed to send order status notification:', error);
+  }
+}
+
+// Send detailed order confirmation to customer
+export async function sendOrderConfirmationToCustomer(
+  order: Order,
+  items: Array<{ product_id: string; quantity: number; price: number; variant_name?: string }>
+): Promise<void> {
+  if (!bot) {
+    console.warn('Bot not initialized');
+    return;
+  }
+  
+  try {
+    // Get product details
+    const { data: products } = await supabaseAdmin
+      .from('products')
+      .select('id, name, article')
+      .in('id', items.map(i => i.product_id));
+    
+    const productsMap = new Map(products?.map(p => [p.id, p]));
+    
+    let itemsList = '';
+    for (const item of items) {
+      const product = productsMap.get(item.product_id);
+      const name = product?.name || 'Товар';
+      const variant = item.variant_name ? ` (${item.variant_name})` : '';
+      const price = formatPrice(item.price * item.quantity, order.currency);
+      itemsList += `• ${name}${variant} × ${item.quantity} — ${price}\n`;
+    }
+    
+    const message = `
+🎉 *Спасибо за заказ!*
+
+Ваш заказ успешно оформлен.
+
+📦 *Ваши товары:*
+${itemsList}
+💰 *Итого: ${formatPrice(order.total, order.currency)}*
+
+🕐 *Статус:* В обработке
+
+Скоро с вами свяжется менеджер для уточнения деталей доставки и оплаты.
+
+_Если у вас есть вопросы — просто напишите их сюда, и мы ответим!_
+    `.trim();
+    
+    await bot.telegram.sendMessage(order.telegram_id, message, {
+      parse_mode: 'Markdown'
+    });
+    
+    // Update conversation context to this order
+    await supabaseAdmin
+      .from('telegram_conversations')
+      .upsert({
+        telegram_id: order.telegram_id,
+        active_order_id: order.id,
+        updated_at: new Date().toISOString()
+      });
+  } catch (error) {
+    console.error('Failed to send order confirmation to customer:', error);
   }
 }
 

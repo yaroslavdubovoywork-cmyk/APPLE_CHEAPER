@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabaseAdmin, supabase } from '../config/supabase';
 import { verifyToken, verifyTelegramWebApp } from '../middleware/auth';
 import { trackEvent } from '../services/analytics';
-import { sendOrderNotification, sendCustomerMessage, sendOrderStatusNotification } from '../bot';
+import { sendOrderNotification, sendCustomerMessage, sendOrderStatusNotification, sendOrderConfirmationToCustomer } from '../bot';
 import { z } from 'zod';
 import { OrderStatus } from '../types';
 
@@ -272,13 +272,9 @@ router.post('/', verifyTelegramWebApp, async (req: Request, res: Response) => {
       console.error('Failed to send order notification:', notifyError);
     }
     
-    // Send "in processing" notification to customer
+    // Send detailed order confirmation to customer
     try {
-      await sendOrderStatusNotification(
-        req.telegramUser.id.toString(),
-        order.id,
-        'pending'
-      );
+      await sendOrderConfirmationToCustomer(order, orderItems);
     } catch (notifyError) {
       console.error('Failed to send customer notification:', notifyError);
     }
