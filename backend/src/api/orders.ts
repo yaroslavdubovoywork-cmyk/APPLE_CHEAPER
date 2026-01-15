@@ -591,31 +591,25 @@ router.post('/:id/messages', verifyToken, async (req: Request, res: Response) =>
       return res.status(403).json({ error: 'Нет доступа к этому заказу' });
     }
     
-    // Send message via Telegram bot
-    let telegramMessageId: string | null = null;
+    // Send message via Telegram bot (it also saves to database now)
     try {
-      const result = await sendCustomerMessage(order.telegram_id, text);
-      telegramMessageId = result?.message_id?.toString() || null;
+      await sendCustomerMessage(order.telegram_id, text, id, userId);
     } catch (botError) {
       console.error('Failed to send Telegram message:', botError);
       return res.status(500).json({ error: 'Не удалось отправить сообщение в Telegram' });
     }
     
-    // Save message to database
+    // Get the saved message to return
     const { data: message, error } = await supabaseAdmin
       .from('order_messages')
-      .insert({
-        order_id: id,
-        direction: 'out',
-        telegram_chat_id: order.telegram_id,
-        telegram_message_id: telegramMessageId,
-        text,
-        created_by_admin_id: userId
-      })
       .select(`
         *,
         admin:admin_users!order_messages_created_by_admin_id_fkey(id, email)
       `)
+      .eq('order_id', id)
+      .eq('direction', 'out')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single();
     
     if (error) throw error;

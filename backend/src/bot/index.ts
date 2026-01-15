@@ -310,10 +310,8 @@ export function setupCallbackHandlers(): void {
         .single();
       
       if (order?.telegram_id) {
-        await bot?.telegram.sendMessage(
-          order.telegram_id,
-          '✅ Ваш заказ подтверждён! Скоро мы свяжемся с вами для уточнения деталей.'
-        );
+        const message = '✅ Ваш заказ подтверждён! Скоро мы свяжемся с вами для уточнения деталей.';
+        await sendAndSaveMessage(order.telegram_id, message, orderId);
       }
     } catch (error) {
       console.error('Failed to confirm order:', error);
@@ -341,10 +339,8 @@ export function setupCallbackHandlers(): void {
         .single();
       
       if (order?.telegram_id) {
-        await bot?.telegram.sendMessage(
-          order.telegram_id,
-          '❌ К сожалению, ваш заказ был отменён. Свяжитесь с нами для уточнения причин.'
-        );
+        const message = '❌ К сожалению, ваш заказ был отменён. Свяжитесь с нами для уточнения причин.';
+        await sendAndSaveMessage(order.telegram_id, message, orderId);
       }
     } catch (error) {
       console.error('Failed to cancel order:', error);
@@ -353,10 +349,12 @@ export function setupCallbackHandlers(): void {
   });
 }
 
-// Send message to customer from admin
-export async function sendCustomerMessage(
+// Helper: Send message and save to order_messages
+async function sendAndSaveMessage(
   telegramId: string,
-  text: string
+  text: string,
+  orderId?: string,
+  adminId?: string
 ): Promise<{ message_id: number } | null> {
   if (!bot) {
     console.warn('Bot not initialized');
@@ -364,12 +362,65 @@ export async function sendCustomerMessage(
   }
   
   try {
-    const result = await bot.telegram.sendMessage(telegramId, text);
+    const result = await bot.telegram.sendMessage(telegramId, text, {
+      parse_mode: 'Markdown'
+    });
+    
+    // Find order_id if not provided
+    let targetOrderId = orderId;
+    if (!targetOrderId) {
+      // Try to get from conversation context
+      const { data: conversation } = await supabaseAdmin
+        .from('telegram_conversations')
+        .select('active_order_id')
+        .eq('telegram_id', telegramId)
+        .single();
+      
+      if (conversation?.active_order_id) {
+        targetOrderId = conversation.active_order_id;
+      } else {
+        // Get most recent order
+        const { data: recentOrder } = await supabaseAdmin
+          .from('orders')
+          .select('id')
+          .eq('telegram_id', telegramId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        targetOrderId = recentOrder?.id;
+      }
+    }
+    
+    // Save message to database
+    if (targetOrderId) {
+      await supabaseAdmin
+        .from('order_messages')
+        .insert({
+          order_id: targetOrderId,
+          direction: 'out',
+          telegram_chat_id: telegramId,
+          telegram_message_id: result.message_id.toString(),
+          text: text,
+          created_by_admin_id: adminId || null
+        });
+    }
+    
     return { message_id: result.message_id };
   } catch (error) {
-    console.error('Failed to send customer message:', error);
+    console.error('Failed to send and save message:', error);
     throw error;
   }
+}
+
+// Send message to customer from admin
+export async function sendCustomerMessage(
+  telegramId: string,
+  text: string,
+  orderId?: string,
+  adminId?: string
+): Promise<{ message_id: number } | null> {
+  return sendAndSaveMessage(telegramId, text, orderId, adminId);
 }
 
 // Send order status notification to customer
@@ -400,7 +451,8 @@ export async function sendOrderStatusNotification(
   if (!message) return;
   
   try {
-    await bot.telegram.sendMessage(telegramId, message);
+    // Send and save message
+    await sendAndSaveMessage(telegramId, message, orderId);
     
     // Update conversation context to this order
     await supabaseAdmin
@@ -466,10 +518,24 @@ _Если у вас есть вопросы — просто напишите и
     `.trim();
     
     console.log('  Sending message to telegram_id:', order.telegram_id);
-    await bot.telegram.sendMessage(order.telegram_id, message, {
+    
+    // Send and save to order_messages
+    const result = await bot.telegram.sendMessage(order.telegram_id, message, {
       parse_mode: 'Markdown'
     });
-    console.log('  Message sent successfully!');
+    
+    // Save to order_messages
+    await supabaseAdmin
+      .from('order_messages')
+      .insert({
+        order_id: order.id,
+        direction: 'out',
+        telegram_chat_id: order.telegram_id,
+        telegram_message_id: result.message_id.toString(),
+        text: message
+      });
+    
+    console.log('  Message sent and saved successfully!');
     
     // Update conversation context to this order
     await supabaseAdmin
