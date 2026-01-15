@@ -89,10 +89,13 @@ export default function Checkout() {
     createOrderMutation.mutate({
       items: items.map(item => ({
         product_id: item.product.id,
-        quantity: item.quantity
+        quantity: item.quantity,
+        variant_id: item.variant?.id
       })),
       ...formData,
-      currency
+      currency,
+      telegram_id: user?.id?.toString() || 'unknown',
+      telegram_username: user?.username || user?.first_name || 'unknown'
     });
   };
   

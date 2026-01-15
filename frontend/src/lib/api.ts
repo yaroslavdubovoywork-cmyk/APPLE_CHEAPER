@@ -221,12 +221,14 @@ export const brandsApi = {
 // Orders API
 export const ordersApi = {
   create: async (data: {
-    items: Array<{ product_id: string; quantity: number }>;
+    items: Array<{ product_id: string; quantity: number; variant_id?: string }>;
     contact_name: string;
     contact_phone: string;
     contact_address?: string;
     notes?: string;
     currency?: Currency;
+    telegram_id?: string;
+    telegram_username?: string;
   }): Promise<Order> => {
     if (USE_MOCK) {
       return {
@@ -247,9 +249,9 @@ export const ordersApi = {
       };
     }
     
-    // Get Telegram ID from WebApp
-    const telegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString() || 'anonymous';
-    const telegramUsername = window.Telegram?.WebApp?.initDataUnsafe?.user?.username || null;
+    // Get Telegram ID - prefer passed value, fallback to WebApp
+    const telegramId = data.telegram_id || window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString() || 'anonymous';
+    const telegramUsername = data.telegram_username || window.Telegram?.WebApp?.initDataUnsafe?.user?.username || null;
     
     // Calculate total
     const productIds = data.items.map(i => i.product_id);
@@ -282,12 +284,36 @@ export const ordersApi = {
     
     if (error) throw error;
     
-    // Create order items
-    const orderItems = data.items.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      price: products?.find(p => p.id === item.product_id)?.price || 0
+    // Create order items with variant info
+    const orderItems = await Promise.all(data.items.map(async (item) => {
+      let variantName = null;
+      let price = products?.find(p => p.id === item.product_id)?.price || 0;
+      
+      // If variant is selected, get its info
+      if (item.variant_id) {
+        const { data: variant } = await supabase!
+          .from('product_variants')
+          .select('color_name, price')
+          .eq('id', item.variant_id)
+          .single();
+        
+        if (variant) {
+          variantName = variant.color_name;
+          // Use variant price if set
+          if (variant.price) {
+            price = variant.price;
+          }
+        }
+      }
+      
+      return {
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        price,
+        variant_id: item.variant_id || null,
+        variant_name: variantName
+      };
     }));
     
     await supabase!.from('order_items').insert(orderItems);
