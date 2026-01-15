@@ -66,7 +66,7 @@ export default function Cart() {
   }
   
   return (
-    <div className="min-h-screen pt-safe-top pb-40">
+    <div className="min-h-screen pt-safe-top pb-24">
       {/* Header */}
       <header className="px-4 py-4 flex items-center justify-between">
         <div>
@@ -98,28 +98,30 @@ export default function Cart() {
         </AnimatePresence>
       </div>
       
-      {/* Bottom Summary & Checkout */}
-      <div className="fixed bottom-16 left-0 right-0 p-4 glass border-t border-[var(--tg-theme-hint-color)]/10">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-[var(--tg-theme-hint-color)]">
-            {t('cart.total')}
-          </span>
-          <motion.span
-            key={total}
-            initial={{ scale: 1.1 }}
-            animate={{ scale: 1 }}
-            className="text-2xl font-bold text-[var(--tg-theme-text-color)]"
+      {/* Summary & Checkout - Dynamic position below items */}
+      <div className="px-4 mt-6 mb-4">
+        <div className="p-4 rounded-2xl bg-[var(--tg-theme-secondary-bg-color)] border border-[var(--tg-theme-hint-color)]/10">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[var(--tg-theme-hint-color)]">
+              {t('cart.total')}
+            </span>
+            <motion.span
+              key={total}
+              initial={{ scale: 1.1 }}
+              animate={{ scale: 1 }}
+              className="text-2xl font-bold text-[var(--tg-theme-text-color)]"
+            >
+              {formatPrice(total, currency)}
+            </motion.span>
+          </div>
+          
+          <button
+            onClick={handleCheckout}
+            className="w-full py-4 rounded-2xl bg-[var(--tg-theme-button-color)] text-[var(--tg-theme-button-text-color)] font-semibold text-lg transition-all duration-200 active:scale-[0.98]"
           >
-            {formatPrice(total, currency)}
-          </motion.span>
+            {t('cart.checkout')}
+          </button>
         </div>
-        
-        <button
-          onClick={handleCheckout}
-          className="w-full py-4 rounded-2xl bg-[var(--tg-theme-button-color)] text-[var(--tg-theme-button-text-color)] font-semibold text-lg transition-all duration-200 active:scale-[0.98]"
-        >
-          {t('cart.checkout')}
-        </button>
       </div>
     </div>
   );
