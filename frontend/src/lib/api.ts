@@ -296,19 +296,18 @@ async function createOrderDirect(data: {
   
   await supabase!.from('order_items').insert(orderItems);
   
-  // Try to send notification via backend (even for direct orders)
-  if (API_URL) {
-    try {
-      await fetch(`${API_URL}/orders/${order.id}/notify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Telegram-Init-Data': window.Telegram?.WebApp?.initData || ''
-        }
-      });
-    } catch (e) {
-      console.warn('Failed to send order notification:', e);
-    }
+  // Send notification via Supabase Edge Function (always works!)
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    await fetch(`${supabaseUrl}/functions/v1/send-order-notification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ order_id: order.id })
+    });
+  } catch (e) {
+    console.warn('Failed to send order notification:', e);
   }
   
   return order;
@@ -371,7 +370,21 @@ export const ordersApi = {
         });
         
         if (response.ok) {
-          return response.json();
+          const order = await response.json();
+          
+          // Also call Edge Function as backup (in case backend notification failed)
+          try {
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            await fetch(`${supabaseUrl}/functions/v1/send-order-notification`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ order_id: order.id })
+            });
+          } catch (e) {
+            // Ignore - backend might have already sent notification
+          }
+          
+          return order;
         }
         
         // If backend fails, fall through to direct Supabase
