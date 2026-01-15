@@ -219,7 +219,85 @@ export const brandsApi = {
 };
 
 // Backend API URL for order creation (with notifications)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+// Helper: Create order via direct Supabase (fallback)
+async function createOrderDirect(data: {
+  items: Array<{ product_id: string; quantity: number; variant_id?: string }>;
+  contact_name: string;
+  contact_phone: string;
+  contact_address?: string;
+  notes?: string;
+  currency?: Currency;
+}): Promise<Order> {
+  const telegramId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id?.toString() || 'anonymous';
+  const telegramUsername = window.Telegram?.WebApp?.initDataUnsafe?.user?.username || null;
+  
+  // Calculate total
+  const productIds = data.items.map(i => i.product_id);
+  const { data: products } = await supabase!
+    .from('products')
+    .select('id, price')
+    .in('id', productIds);
+  
+  const total = data.items.reduce((sum, item) => {
+    const product = products?.find(p => p.id === item.product_id);
+    return sum + (product?.price || 0) * item.quantity;
+  }, 0);
+  
+  // Create order
+  const { data: order, error } = await supabase!
+    .from('orders')
+    .insert({
+      telegram_id: telegramId,
+      telegram_username: telegramUsername,
+      status: 'pending',
+      total,
+      currency: data.currency || 'RUB',
+      contact_name: data.contact_name,
+      contact_phone: data.contact_phone,
+      contact_address: data.contact_address,
+      notes: data.notes
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  
+  // Create order items with variant info
+  const orderItems = await Promise.all(data.items.map(async (item) => {
+    let variantName = null;
+    let price = products?.find(p => p.id === item.product_id)?.price || 0;
+    
+    if (item.variant_id) {
+      const { data: variant } = await supabase!
+        .from('product_variants')
+        .select('color_name, price')
+        .eq('id', item.variant_id)
+        .single();
+      
+      if (variant) {
+        variantName = variant.color_name;
+        if (variant.price) {
+          price = variant.price;
+        }
+      }
+    }
+    
+    return {
+      order_id: order.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      price,
+      variant_id: item.variant_id || null,
+      variant_name: variantName
+    };
+  }));
+  
+  await supabase!.from('order_items').insert(orderItems);
+  
+  return order;
+}
 
 // Orders API
 export const ordersApi = {
@@ -252,36 +330,44 @@ export const ordersApi = {
       };
     }
     
-    // Get Telegram initData for authentication
-    const initData = window.Telegram?.WebApp?.initData || '';
-    
-    // Create order via backend (handles notifications)
-    const response = await fetch(`${API_URL}/orders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Telegram-Init-Data': initData
-      },
-      body: JSON.stringify({
-        items: data.items.map(item => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          variant_id: item.variant_id
-        })),
-        contact_name: data.contact_name,
-        contact_phone: data.contact_phone,
-        contact_address: data.contact_address,
-        notes: data.notes,
-        currency: data.currency || 'RUB'
-      })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create order');
+    // Try backend first (has notifications), fallback to direct Supabase
+    if (API_URL) {
+      try {
+        const initData = window.Telegram?.WebApp?.initData || '';
+        
+        const response = await fetch(`${API_URL}/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': initData
+          },
+          body: JSON.stringify({
+            items: data.items.map(item => ({
+              product_id: item.product_id,
+              quantity: item.quantity,
+              variant_id: item.variant_id
+            })),
+            contact_name: data.contact_name,
+            contact_phone: data.contact_phone,
+            contact_address: data.contact_address,
+            notes: data.notes,
+            currency: data.currency || 'RUB'
+          })
+        });
+        
+        if (response.ok) {
+          return response.json();
+        }
+        
+        // If backend fails, fall through to direct Supabase
+        console.warn('Backend order creation failed, using direct Supabase');
+      } catch (err) {
+        console.warn('Backend unavailable, using direct Supabase:', err);
+      }
     }
     
-    return response.json();
+    // Fallback: direct Supabase (no notifications, but order is saved)
+    return createOrderDirect(data);
   },
   
   getMy: async (): Promise<Order[]> => {

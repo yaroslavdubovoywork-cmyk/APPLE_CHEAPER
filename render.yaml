@@ -2,6 +2,33 @@
 # https://render.com/docs/blueprint-spec
 
 services:
+  # Backend API
+  - type: web
+    name: apple-cheaper-backend
+    env: node
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_OWNER_ID
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://apple-cheaper-app.onrender.com
+      - key: ADMIN_URL
+        value: https://apple-cheaper-admin.onrender.com
+
   # Frontend Mini App (Telegram WebApp)
   - type: web
     name: apple-cheaper-app
@@ -21,6 +48,8 @@ services:
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
         sync: false
+      - key: VITE_API_URL
+        value: https://apple-cheaper-backend.onrender.com/api
 
   # Admin Panel
   - type: web
@@ -43,3 +72,5 @@ services:
         sync: false
       - key: VITE_SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: VITE_API_URL
+        value: https://apple-cheaper-backend.onrender.com/api
