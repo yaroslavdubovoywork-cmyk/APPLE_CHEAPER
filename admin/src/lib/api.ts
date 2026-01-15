@@ -1,5 +1,14 @@
 import { supabase } from './supabase';
 
+// Backend API base URL - MUST be defined before usage
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+// Helper to get auth header
+const getAuthHeader = (): Record<string, string> => {
+  const token = localStorage.getItem('admin_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // Types
 export interface ProductVariant {
   id: string;
@@ -470,15 +479,6 @@ export const categoriesApi = {
     if (error) throw error;
     return { success: true };
   }
-};
-
-// Backend API base URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-// Helper to get auth header
-const getAuthHeader = (): Record<string, string> => {
-  const token = localStorage.getItem('admin_token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // Orders API (CRM-enabled with backend endpoints)
