@@ -109,32 +109,136 @@ export default function Checkout() {
   
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-green-500/10 to-transparent">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="w-full max-w-sm"
         >
-          <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+          {/* Success Card */}
+          <div className="bg-white dark:bg-zinc-900 rounded-[32px] shadow-2xl p-8 text-center border border-zinc-100 dark:border-zinc-800">
+            {/* Animated Check Icon */}
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 15 }}
+              className="relative mx-auto mb-6"
+            >
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                <motion.svg 
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ delay: 0.5, duration: 0.5 }}
+                  className="w-12 h-12 text-white" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
+                  strokeWidth={3}
+                >
+                  <motion.path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    d="M5 13l4 4L19 7"
+                  />
+                </motion.svg>
+              </div>
+              {/* Pulse rings */}
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0.5 }}
+                animate={{ scale: 1.5, opacity: 0 }}
+                transition={{ delay: 0.3, duration: 1, repeat: 2 }}
+                className="absolute inset-0 rounded-full bg-green-400"
+              />
+            </motion.div>
+            
+            {/* Title */}
+            <motion.h1 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-2xl font-bold text-zinc-900 dark:text-white mb-2"
+            >
+              {i18n.language === 'ru' ? 'Заказ принят!' : 'Order Received!'}
+            </motion.h1>
+            
+            {/* Status Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium mb-4"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              {i18n.language === 'ru' ? 'В обработке' : 'Processing'}
+            </motion.div>
+            
+            {/* Description */}
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed"
+            >
+              {i18n.language === 'ru' 
+                ? 'Мы уже начали обрабатывать ваш заказ. Статус можно отслеживать во вкладке заказов.' 
+                : 'We have started processing your order. You can track the status in the orders tab.'}
+            </motion.p>
+            
+            {/* Orders Link Hint */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="flex items-center justify-center gap-3 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 mb-6"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                  {i18n.language === 'ru' ? 'Мои заказы' : 'My Orders'}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {i18n.language === 'ru' ? 'Вкладка в нижнем меню' : 'Tab in bottom menu'}
+                </p>
+              </div>
+              <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </motion.div>
+            
+            {/* Done Button */}
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/')}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-zinc-900 to-zinc-800 dark:from-white dark:to-zinc-200 text-white dark:text-zinc-900 font-semibold text-lg shadow-lg shadow-zinc-900/20 dark:shadow-white/20 transition-all duration-200"
+            >
+              {i18n.language === 'ru' ? 'Готово' : 'Done'}
+            </motion.button>
           </div>
           
-          <h1 className="text-2xl font-bold text-[var(--tg-theme-text-color)] mb-2">
-            {t('checkout.success')}
-          </h1>
-          
-          <p className="text-[var(--tg-theme-hint-color)] mb-8">
-            {t('checkout.successText')}
-          </p>
-          
-          <button
-            onClick={() => navigate('/')}
-            className="px-8 py-4 rounded-2xl bg-[var(--tg-theme-button-color)] text-[var(--tg-theme-button-text-color)] font-semibold"
+          {/* Decorative elements */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+            className="flex justify-center gap-2 mt-6"
           >
-            {t('catalog.title')}
-          </button>
+            <span className="text-2xl">🎉</span>
+            <span className="text-zinc-400 dark:text-zinc-500 text-sm self-center">
+              {i18n.language === 'ru' ? 'Спасибо за заказ!' : 'Thank you for your order!'}
+            </span>
+            <span className="text-2xl">🎉</span>
+          </motion.div>
         </motion.div>
       </div>
     );
