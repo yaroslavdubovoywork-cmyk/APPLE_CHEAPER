@@ -172,7 +172,7 @@ export function initBot(): Telegraf | null {
       }
       
       if (activeOrderId) {
-        // Save incoming message to order_messages
+        // Save incoming message to order_messages (no auto-reply)
         await supabaseAdmin
           .from('order_messages')
           .insert({
@@ -182,11 +182,6 @@ export function initBot(): Telegraf | null {
             telegram_message_id: messageId,
             text: messageText
           });
-        
-        // Acknowledge receipt
-        await ctx.reply(
-          '✅ Сообщение получено. Менеджер ответит вам в ближайшее время.'
-        );
       } else {
         // No active order - show default response
         await ctx.reply(
