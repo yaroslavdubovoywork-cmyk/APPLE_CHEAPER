@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ export default function Checkout() {
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSuccess, setIsSuccess] = useState(false);
+  const orderCompletedRef = useRef(false);
   
   // Setup back button
   useEffect(() => {
@@ -45,6 +46,8 @@ export default function Checkout() {
   const createOrderMutation = useMutation({
     mutationFn: ordersApi.create,
     onSuccess: () => {
+      // Set ref immediately to prevent redirect
+      orderCompletedRef.current = true;
       setIsSuccess(true);
       clearCart();
       haptic('success');
@@ -244,7 +247,8 @@ export default function Checkout() {
     );
   }
   
-  if (items.length === 0) {
+  // Only redirect if cart is empty AND order wasn't just completed
+  if (items.length === 0 && !isSuccess && !orderCompletedRef.current) {
     navigate('/cart');
     return null;
   }
