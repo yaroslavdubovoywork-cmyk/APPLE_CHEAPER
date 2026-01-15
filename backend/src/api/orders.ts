@@ -144,10 +144,15 @@ router.get('/my/list', verifyTelegramWebApp, async (req: Request, res: Response)
 
 // POST /api/orders - Create order (Telegram user)
 router.post('/', verifyTelegramWebApp, async (req: Request, res: Response) => {
+  console.log('POST /api/orders - Creating order');
+  console.log('  telegramUser:', req.telegramUser?.id);
+  console.log('  body items count:', req.body?.items?.length);
+  
   try {
     const validatedData = createOrderSchema.parse(req.body);
     
     if (!req.telegramUser) {
+      console.log('  ERROR: No telegramUser');
       return res.status(401).json({ error: 'Telegram authentication required' });
     }
     
@@ -273,8 +278,10 @@ router.post('/', verifyTelegramWebApp, async (req: Request, res: Response) => {
     }
     
     // Send detailed order confirmation to customer
+    console.log('  Sending customer notification...');
     try {
       await sendOrderConfirmationToCustomer(order, orderItems);
+      console.log('  Customer notification sent successfully');
     } catch (notifyError) {
       console.error('Failed to send customer notification:', notifyError);
     }

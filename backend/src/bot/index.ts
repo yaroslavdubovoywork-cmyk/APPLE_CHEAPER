@@ -425,8 +425,14 @@ export async function sendOrderConfirmationToCustomer(
   order: Order,
   items: Array<{ product_id: string; quantity: number; price: number; variant_name?: string }>
 ): Promise<void> {
+  console.log('sendOrderConfirmationToCustomer called');
+  console.log('  order.telegram_id:', order.telegram_id);
+  console.log('  order.id:', order.id);
+  console.log('  items count:', items.length);
+  console.log('  bot initialized:', !!bot);
+  
   if (!bot) {
-    console.warn('Bot not initialized');
+    console.warn('Bot not initialized - cannot send message');
     return;
   }
   
@@ -464,9 +470,11 @@ ${itemsList}
 _Если у вас есть вопросы — просто напишите их сюда, и мы ответим!_
     `.trim();
     
+    console.log('  Sending message to telegram_id:', order.telegram_id);
     await bot.telegram.sendMessage(order.telegram_id, message, {
       parse_mode: 'Markdown'
     });
+    console.log('  Message sent successfully!');
     
     // Update conversation context to this order
     await supabaseAdmin
@@ -476,6 +484,7 @@ _Если у вас есть вопросы — просто напишите и
         active_order_id: order.id,
         updated_at: new Date().toISOString()
       });
+    console.log('  Conversation context updated');
   } catch (error) {
     console.error('Failed to send order confirmation to customer:', error);
   }
