@@ -476,7 +476,7 @@ export const categoriesApi = {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 // Helper to get auth header
-const getAuthHeader = () => {
+const getAuthHeader = (): Record<string, string> => {
   const token = localStorage.getItem('admin_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
