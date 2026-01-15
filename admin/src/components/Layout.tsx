@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -9,19 +9,28 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  ClipboardList
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 
-const navigation = [
+// Admin-only navigation items
+const adminNavigation = [
   { name: 'Дашборд', href: '/', icon: LayoutDashboard },
   { name: 'Товары', href: '/products', icon: Package },
   { name: 'Категории', href: '/categories', icon: FolderTree },
-  { name: 'Заказы', href: '/orders', icon: ShoppingCart },
+  { name: 'Все заказы', href: '/orders', icon: ShoppingCart },
+  { name: 'Мои заказы', href: '/my-orders', icon: ClipboardList },
   { name: 'Загрузка прайсов', href: '/prices', icon: Upload },
   { name: 'Настройки', href: '/settings', icon: Settings },
+];
+
+// Manager-only navigation items
+const managerNavigation = [
+  { name: 'Все заказы', href: '/orders', icon: ShoppingCart },
+  { name: 'Мои заказы', href: '/my-orders', icon: ClipboardList },
 ];
 
 interface LayoutProps {
@@ -32,6 +41,11 @@ export function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Select navigation based on user role
+  const navigation = useMemo(() => {
+    return user?.role === 'manager' ? managerNavigation : adminNavigation;
+  }, [user?.role]);
   
   const handleLogout = () => {
     logout();

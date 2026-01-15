@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ShoppingCart, Eye, Package, MessageCircle, Send, User, UserCheck } from 'lucide-react';
+import { ShoppingCart, Eye, Package, MessageCircle, Send } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,18 +38,17 @@ const statusLabels: Record<string, string> = {
   cancelled: 'Отменён'
 };
 
-export default function Orders() {
+export default function MyOrders() {
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
   const [filterStatus, setFilterStatus] = useState('');
   const [page, setPage] = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [newMessage, setNewMessage] = useState('');
   
-  // Fetch orders
+  // Fetch MY orders only
   const { data: ordersData, isLoading } = useQuery({
-    queryKey: ['orders', filterStatus, page],
-    queryFn: () => ordersApi.getAll({ status: filterStatus, page, limit: 20 })
+    queryKey: ['my-orders', filterStatus, page],
+    queryFn: () => ordersApi.getAll({ status: filterStatus, page, limit: 20, my_orders: true })
   });
   
   // Fetch single order
@@ -60,18 +58,11 @@ export default function Orders() {
     enabled: !!selectedOrder
   });
   
-  // Fetch managers (for admin to assign)
-  const { data: managers } = useQuery({
-    queryKey: ['managers'],
-    queryFn: () => ordersApi.getManagers(),
-    enabled: user?.role === 'admin'
-  });
-  
   // Fetch messages
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ['order-messages', selectedOrder?.id],
     queryFn: () => ordersApi.getMessages(selectedOrder.id),
-    enabled: !!selectedOrder && !!orderDetails?.assigned_manager_id,
+    enabled: !!selectedOrder,
     refetchInterval: 5000 // Poll every 5 seconds
   });
   
@@ -80,20 +71,9 @@ export default function Orders() {
     mutationFn: ({ id, status }: { id: string; status: string }) => 
       ordersApi.updateStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
       queryClient.invalidateQueries({ queryKey: ['order', selectedOrder?.id] });
       toast.success('Статус обновлён');
-    },
-    onError: (error: Error) => toast.error(error.message)
-  });
-  
-  // Claim order
-  const claimOrderMutation = useMutation({
-    mutationFn: (orderId: string) => ordersApi.claimOrder(orderId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order', selectedOrder?.id] });
-      toast.success('Заказ взят');
     },
     onError: (error: Error) => toast.error(error.message)
   });
@@ -102,21 +82,9 @@ export default function Orders() {
   const releaseOrderMutation = useMutation({
     mutationFn: (orderId: string) => ordersApi.releaseOrder(orderId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order', selectedOrder?.id] });
-      toast.success('Заказ снят');
-    },
-    onError: (error: Error) => toast.error(error.message)
-  });
-  
-  // Assign order (admin only)
-  const assignOrderMutation = useMutation({
-    mutationFn: ({ orderId, managerId }: { orderId: string; managerId: string }) => 
-      ordersApi.assignOrder(orderId, managerId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order', selectedOrder?.id] });
-      toast.success('Заказ назначен');
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+      setSelectedOrder(null);
+      toast.success('Заказ снят с вас');
     },
     onError: (error: Error) => toast.error(error.message)
   });
@@ -141,19 +109,11 @@ export default function Orders() {
     sendMessageMutation.mutate({ orderId: selectedOrder.id, text: newMessage.trim() });
   };
   
-  const isMyOrder = (order: any) => {
-    return order.assigned_manager_id === user?.id || order.assigned_manager?.id === user?.id;
-  };
-  
-  const canClaimOrder = (order: any) => {
-    return !order.assigned_manager_id;
-  };
-  
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Все заказы</h1>
-        <p className="text-muted-foreground">Управление заказами покупателей</p>
+        <h1 className="text-3xl font-bold">Мои заказы</h1>
+        <p className="text-muted-foreground">Заказы, закреплённые за вами</p>
       </div>
       
       {/* Filter */}
@@ -177,7 +137,8 @@ export default function Orders() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <ShoppingCart className="w-12 h-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Заказы не найдены</p>
+                <p className="text-muted-foreground">У вас пока нет заказов</p>
+                <p className="text-sm text-muted-foreground">Возьмите заказ из раздела "Все заказы"</p>
               </CardContent>
             </Card>
           ) : (
@@ -198,23 +159,9 @@ export default function Orders() {
                         {formatDate(order.created_at)}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge variant={statusBadgeVariant[order.status]}>
-                        {statusLabels[order.status]}
-                      </Badge>
-                      {/* Manager assignment badge */}
-                      {order.assigned_manager ? (
-                        <Badge variant={isMyOrder(order) ? "default" : "secondary"} className="text-xs">
-                          <UserCheck className="w-3 h-3 mr-1" />
-                          {isMyOrder(order) ? 'Мой' : order.assigned_manager.email?.split('@')[0]}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">
-                          <User className="w-3 h-3 mr-1" />
-                          Свободен
-                        </Badge>
-                      )}
-                    </div>
+                    <Badge variant={statusBadgeVariant[order.status]}>
+                      {statusLabels[order.status]}
+                    </Badge>
                   </div>
                   
                   <div className="flex items-center justify-between">
@@ -265,63 +212,15 @@ export default function Orders() {
                             {formatDate(orderDetails.created_at)}
                           </p>
                         </div>
-                        
-                        {/* Claim/Release buttons */}
-                        <div className="flex gap-2">
-                          {canClaimOrder(orderDetails) ? (
-                            <Button
-                              onClick={() => claimOrderMutation.mutate(orderDetails.id)}
-                              disabled={claimOrderMutation.isPending}
-                            >
-                              Взять заказ
-                            </Button>
-                          ) : isMyOrder(orderDetails) ? (
-                            <Button
-                              variant="outline"
-                              onClick={() => releaseOrderMutation.mutate(orderDetails.id)}
-                              disabled={releaseOrderMutation.isPending}
-                            >
-                              Снять заказ
-                            </Button>
-                          ) : user?.role === 'admin' ? (
-                            <Select
-                              value={orderDetails.assigned_manager?.id || ''}
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  assignOrderMutation.mutate({
-                                    orderId: orderDetails.id,
-                                    managerId: e.target.value
-                                  });
-                                }
-                              }}
-                              options={[
-                                { value: '', label: 'Переназначить...' },
-                                ...(managers || []).map((m: any) => ({
-                                  value: m.id,
-                                  label: m.email
-                                }))
-                              ]}
-                              className="w-[200px]"
-                            />
-                          ) : (
-                            <Badge variant="secondary">
-                              Взял: {orderDetails.assigned_manager?.email}
-                            </Badge>
-                          )}
-                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => releaseOrderMutation.mutate(orderDetails.id)}
+                          disabled={releaseOrderMutation.isPending}
+                        >
+                          Снять заказ
+                        </Button>
                       </div>
-                      
-                      {/* Manager info */}
-                      {orderDetails.assigned_manager && (
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <div className="flex items-center gap-2 text-sm">
-                            <UserCheck className="w-4 h-4 text-primary" />
-                            <span>
-                              Ведёт: <strong>{orderDetails.assigned_manager.email}</strong>
-                            </span>
-                          </div>
-                        </div>
-                      )}
                       
                       <div>
                         <h4 className="text-sm font-medium mb-2">Статус</h4>
@@ -332,7 +231,6 @@ export default function Orders() {
                             status: e.target.value 
                           })}
                           options={statusOptions.slice(1)}
-                          disabled={!isMyOrder(orderDetails) && user?.role !== 'admin'}
                         />
                       </div>
                       
@@ -410,88 +308,74 @@ export default function Orders() {
                 </CardContent>
               </Card>
               
-              {/* Chat - only visible for assigned orders */}
-              {orderDetails?.assigned_manager_id && (isMyOrder(orderDetails) || user?.role === 'admin') && (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <MessageCircle className="w-5 h-5" />
-                      <h4 className="font-semibold">Чат с клиентом</h4>
-                    </div>
-                    
-                    {/* Messages */}
-                    <div className="h-64 overflow-y-auto border rounded-lg p-3 mb-4 space-y-3 bg-muted/30">
-                      {messagesLoading ? (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full" />
-                        </div>
-                      ) : messages && messages.length > 0 ? (
-                        messages.map((msg: any) => (
-                          <div
-                            key={msg.id}
-                            className={cn(
-                              "max-w-[80%] p-3 rounded-lg",
-                              msg.direction === 'out'
-                                ? "ml-auto bg-primary text-primary-foreground"
-                                : "bg-card border"
+              {/* Chat */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <MessageCircle className="w-5 h-5" />
+                    <h4 className="font-semibold">Чат с клиентом</h4>
+                  </div>
+                  
+                  {/* Messages */}
+                  <div className="h-64 overflow-y-auto border rounded-lg p-3 mb-4 space-y-3 bg-muted/30">
+                    {messagesLoading ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full" />
+                      </div>
+                    ) : messages && messages.length > 0 ? (
+                      messages.map((msg: any) => (
+                        <div
+                          key={msg.id}
+                          className={cn(
+                            "max-w-[80%] p-3 rounded-lg",
+                            msg.direction === 'out'
+                              ? "ml-auto bg-primary text-primary-foreground"
+                              : "bg-card border"
+                          )}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                          <p className={cn(
+                            "text-xs mt-1",
+                            msg.direction === 'out' ? "text-primary-foreground/70" : "text-muted-foreground"
+                          )}>
+                            {new Date(msg.created_at).toLocaleString('ru-RU')}
+                            {msg.direction === 'out' && msg.admin?.email && (
+                              <span className="ml-2">• {msg.admin.email}</span>
                             )}
-                          >
-                            <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                            <p className={cn(
-                              "text-xs mt-1",
-                              msg.direction === 'out' ? "text-primary-foreground/70" : "text-muted-foreground"
-                            )}>
-                              {new Date(msg.created_at).toLocaleString('ru-RU')}
-                              {msg.direction === 'out' && msg.admin?.email && (
-                                <span className="ml-2">• {msg.admin.email}</span>
-                              )}
-                            </p>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground">
-                          Нет сообщений
+                          </p>
                         </div>
-                      )}
-                    </div>
-                    
-                    {/* Send message */}
-                    <div className="flex gap-2">
-                      <Input
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Напишите сообщение..."
-                        onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                      />
-                      <Button
-                        onClick={handleSendMessage}
-                        disabled={!newMessage.trim() || sendMessageMutation.isPending}
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {/* Prompt to claim for chat */}
-              {orderDetails && !orderDetails.assigned_manager_id && (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <MessageCircle className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-muted-foreground text-sm">
-                      Возьмите заказ, чтобы начать чат с клиентом
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Нет сообщений
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Send message */}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Напишите сообщение..."
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                    />
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Eye className="w-8 h-8 text-muted-foreground mb-2" />
                 <p className="text-muted-foreground text-sm">
-                  Выберите заказ для просмотра деталей
+                  Выберите заказ для просмотра деталей и чата
                 </p>
               </CardContent>
             </Card>

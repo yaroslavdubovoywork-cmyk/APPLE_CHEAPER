@@ -75,78 +75,81 @@ export interface AdminUser {
   created_at: string;
 }
 
-// Auth API
+// Auth API (uses backend for proper JWT authentication)
 export const authApi = {
   login: async (email: string, password: string) => {
-    // Check if admin exists
-    const { data: admin, error } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
     
-    if (error || !admin) {
-      // If no admin exists, create first one
-      const { count } = await supabase
-        .from('admin_users')
-        .select('*', { count: 'exact', head: true });
-      
-      if (count === 0) {
-        // Create first admin
-        const { data: newAdmin, error: createError } = await supabase
-          .from('admin_users')
-          .insert({
-            email,
-            password_hash: password, // In production, hash this!
-            role: 'admin'
-          })
-          .select()
-          .single();
-        
-        if (createError) throw createError;
-        
-        return {
-          token: 'admin-session-' + Date.now(),
-          user: { id: newAdmin.id, email: newAdmin.email, role: newAdmin.role }
-        };
-      }
-      
-      throw new Error('Invalid credentials');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Login failed');
     }
     
-    // Simple password check (in production use bcrypt!)
-    if (admin.password_hash !== password) {
-      throw new Error('Invalid credentials');
+    const data = await response.json();
+    
+    // Store token
+    if (data.token) {
+      localStorage.setItem('admin_token', data.token);
     }
     
-    return {
-      token: 'admin-session-' + Date.now(),
-      user: { id: admin.id, email: admin.email, role: admin.role }
-    };
+    return data;
   },
   
   setup: async (email: string, password: string) => {
-    const { data: admin, error } = await supabase
-      .from('admin_users')
-      .insert({
-        email,
-        password_hash: password,
-        role: 'admin'
-      })
-      .select()
-      .single();
+    const response = await fetch(`${API_URL}/auth/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
     
-    if (error) throw error;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Setup failed');
+    }
     
-    return {
-      token: 'admin-session-' + Date.now(),
-      user: { id: admin.id, email: admin.email, role: admin.role }
-    };
+    const data = await response.json();
+    
+    // Store token
+    if (data.token) {
+      localStorage.setItem('admin_token', data.token);
+    }
+    
+    return data;
   },
   
   me: async () => {
-    // In a real app, validate the token
-    return { id: 'admin', email: 'admin@example.com', role: 'admin' };
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: { ...getAuthHeader() }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Not authenticated');
+    }
+    
+    return response.json();
+  },
+  
+  // Register new admin/manager (admin only)
+  register: async (email: string, password: string, telegram_id?: string) => {
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify({ email, password, telegram_id })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Registration failed');
+    }
+    
+    return response.json();
   }
 };
 
@@ -469,71 +472,161 @@ export const categoriesApi = {
   }
 };
 
-// Orders API
+// Backend API base URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
+// Helper to get auth header
+const getAuthHeader = () => {
+  const token = localStorage.getItem('admin_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Orders API (CRM-enabled with backend endpoints)
 export const ordersApi = {
-  getAll: async (params?: { page?: number; limit?: number; status?: string }) => {
-    let query = supabase
-      .from('orders')
-      .select(`
-        *,
-        items:order_items(
-          *,
-          product:products(id, name, name_en, article, image_url)
-        )
-      `, { count: 'exact' });
+  getAll: async (params?: { page?: number; limit?: number; status?: string; my_orders?: boolean }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.my_orders) searchParams.set('my_orders', 'true');
     
-    if (params?.status) {
-      query = query.eq('status', params.status);
+    const response = await fetch(`${API_URL}/orders?${searchParams}`, {
+      headers: { ...getAuthHeader() }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch orders');
     }
     
-    const page = params?.page || 1;
-    const limit = params?.limit || 20;
-    const start = (page - 1) * limit;
-    
-    query = query.range(start, start + limit - 1).order('created_at', { ascending: false });
-    
-    const { data, error, count } = await query;
-    
-    if (error) throw error;
-    
-    return {
-      orders: data || [],
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
-      }
-    };
+    return response.json();
   },
   
   getById: async (id: string) => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        items:order_items(
-          *,
-          product:products(id, name, name_en, article, image_url, price)
-        )
-      `)
-      .eq('id', id)
-      .single();
+    const response = await fetch(`${API_URL}/orders/${id}`, {
+      headers: { ...getAuthHeader() }
+    });
     
-    if (error) throw error;
-    return data;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch order');
+    }
+    
+    return response.json();
   },
   
   updateStatus: async (id: string, status: string) => {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single();
+    const response = await fetch(`${API_URL}/orders/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify({ status })
+    });
     
-    if (error) throw error;
-    return data;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update status');
+    }
+    
+    return response.json();
+  },
+  
+  // CRM: Claim order
+  claimOrder: async (id: string) => {
+    const response = await fetch(`${API_URL}/orders/${id}/claim`, {
+      method: 'POST',
+      headers: { ...getAuthHeader() }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to claim order');
+    }
+    
+    return response.json();
+  },
+  
+  // CRM: Release order
+  releaseOrder: async (id: string) => {
+    const response = await fetch(`${API_URL}/orders/${id}/release`, {
+      method: 'POST',
+      headers: { ...getAuthHeader() }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to release order');
+    }
+    
+    return response.json();
+  },
+  
+  // CRM: Assign order to manager (admin only)
+  assignOrder: async (id: string, managerId: string) => {
+    const response = await fetch(`${API_URL}/orders/${id}/assign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify({ manager_id: managerId })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to assign order');
+    }
+    
+    return response.json();
+  },
+  
+  // CRM: Get messages for order
+  getMessages: async (id: string) => {
+    const response = await fetch(`${API_URL}/orders/${id}/messages`, {
+      headers: { ...getAuthHeader() }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch messages');
+    }
+    
+    return response.json();
+  },
+  
+  // CRM: Send message to customer
+  sendMessage: async (id: string, text: string) => {
+    const response = await fetch(`${API_URL}/orders/${id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader()
+      },
+      body: JSON.stringify({ text })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send message');
+    }
+    
+    return response.json();
+  },
+  
+  // CRM: Get list of managers
+  getManagers: async () => {
+    const response = await fetch(`${API_URL}/orders/managers/list`, {
+      headers: { ...getAuthHeader() }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch managers');
+    }
+    
+    return response.json();
   },
   
   getStats: async (days?: number) => {

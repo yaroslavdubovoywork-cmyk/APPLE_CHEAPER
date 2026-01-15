@@ -118,12 +118,87 @@ export function initBot(): Telegraf | null {
     );
   });
   
-  // Handle text messages
+  // Handle text messages - save to order_messages
   bot.on('text', async (ctx) => {
-    // Default response
-    await ctx.reply(
-      'Чтобы открыть магазин, нажмите кнопку "🛒 Открыть магазин" или используйте команду /start'
-    );
+    const telegramId = ctx.from?.id.toString();
+    const messageText = ctx.message.text;
+    const messageId = ctx.message.message_id.toString();
+    
+    if (!telegramId || !messageText) {
+      return;
+    }
+    
+    // Skip if it's a command
+    if (messageText.startsWith('/')) {
+      return;
+    }
+    
+    try {
+      // Find active order for this user (most recent pending/confirmed/processing)
+      let activeOrderId: string | null = null;
+      
+      // First check if there's a conversation context
+      const { data: conversation } = await supabaseAdmin
+        .from('telegram_conversations')
+        .select('active_order_id')
+        .eq('telegram_id', telegramId)
+        .single();
+      
+      if (conversation?.active_order_id) {
+        activeOrderId = conversation.active_order_id;
+      } else {
+        // Find the most recent active order
+        const { data: activeOrder } = await supabaseAdmin
+          .from('orders')
+          .select('id')
+          .eq('telegram_id', telegramId)
+          .in('status', ['pending', 'confirmed', 'processing'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (activeOrder) {
+          activeOrderId = activeOrder.id;
+          
+          // Update conversation context
+          await supabaseAdmin
+            .from('telegram_conversations')
+            .upsert({
+              telegram_id: telegramId,
+              active_order_id: activeOrderId,
+              updated_at: new Date().toISOString()
+            });
+        }
+      }
+      
+      if (activeOrderId) {
+        // Save incoming message to order_messages
+        await supabaseAdmin
+          .from('order_messages')
+          .insert({
+            order_id: activeOrderId,
+            direction: 'in',
+            telegram_chat_id: telegramId,
+            telegram_message_id: messageId,
+            text: messageText
+          });
+        
+        // Acknowledge receipt
+        await ctx.reply(
+          '✅ Сообщение получено. Менеджер ответит вам в ближайшее время.'
+        );
+      } else {
+        // No active order - show default response
+        await ctx.reply(
+          'Чтобы открыть магазин, нажмите кнопку "🛒 Открыть магазин" или используйте команду /start'
+        );
+      }
+    } catch (error) {
+      console.error('Error handling incoming message:', error);
+      await ctx.reply(
+        'Чтобы открыть магазин, нажмите кнопку "🛒 Открыть магазин" или используйте команду /start'
+      );
+    }
   });
   
   // Error handling
@@ -281,6 +356,64 @@ export function setupCallbackHandlers(): void {
       await ctx.answerCbQuery('Ошибка при отмене заказа');
     }
   });
+}
+
+// Send message to customer from admin
+export async function sendCustomerMessage(
+  telegramId: string,
+  text: string
+): Promise<{ message_id: number } | null> {
+  if (!bot) {
+    console.warn('Bot not initialized');
+    return null;
+  }
+  
+  try {
+    const result = await bot.telegram.sendMessage(telegramId, text);
+    return { message_id: result.message_id };
+  } catch (error) {
+    console.error('Failed to send customer message:', error);
+    throw error;
+  }
+}
+
+// Send order status notification to customer
+export async function sendOrderStatusNotification(
+  telegramId: string,
+  orderId: string,
+  status: string
+): Promise<void> {
+  if (!bot) {
+    console.warn('Bot not initialized');
+    return;
+  }
+  
+  const statusMessages: Record<string, string> = {
+    pending: '🕐 Ваш заказ принят и находится в обработке. Мы скоро свяжемся с вами!',
+    confirmed: '✅ Ваш заказ подтверждён! Скоро мы свяжемся с вами для уточнения деталей.',
+    processing: '📦 Ваш заказ обрабатывается.',
+    shipped: '🚚 Ваш заказ отправлен! Ожидайте доставку.',
+    delivered: '✨ Ваш заказ доставлен. Спасибо за покупку!',
+    cancelled: '❌ К сожалению, ваш заказ был отменён. Свяжитесь с нами для уточнения причин.'
+  };
+  
+  const message = statusMessages[status];
+  if (!message) return;
+  
+  try {
+    await bot.telegram.sendMessage(telegramId, message);
+    
+    // Update conversation context to this order
+    await supabaseAdmin
+      .from('telegram_conversations')
+      .upsert({
+        telegram_id: telegramId,
+        active_order_id: orderId,
+        updated_at: new Date().toISOString()
+      });
+  } catch (error) {
+    console.error('Failed to send order status notification:', error);
+  }
 }
 
 export { bot };

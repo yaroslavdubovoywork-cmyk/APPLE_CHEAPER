@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Products = lazy(() => import('./pages/Products'));
 const Categories = lazy(() => import('./pages/Categories'));
 const Orders = lazy(() => import('./pages/Orders'));
+const MyOrders = lazy(() => import('./pages/MyOrders'));
 const PriceUpload = lazy(() => import('./pages/PriceUpload'));
 const Settings = lazy(() => import('./pages/Settings'));
 
@@ -33,50 +34,75 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <Layout>{children}</Layout>;
 }
 
+// Admin-only route wrapper
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user } = useAuthStore();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user?.role !== 'admin') {
+    return <Navigate to="/orders" replace />;
+  }
+  
+  return <Layout>{children}</Layout>;
+}
+
 function App() {
+  const { user } = useAuthStore();
+  
   return (
     <>
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/login" element={<Login />} />
           
+          {/* Admin-only routes */}
           <Route path="/" element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Dashboard />
-            </ProtectedRoute>
+            </AdminRoute>
           } />
           
           <Route path="/products" element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Products />
-            </ProtectedRoute>
+            </AdminRoute>
           } />
           
           <Route path="/categories" element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Categories />
-            </ProtectedRoute>
+            </AdminRoute>
           } />
           
+          <Route path="/prices" element={
+            <AdminRoute>
+              <PriceUpload />
+            </AdminRoute>
+          } />
+          
+          <Route path="/settings" element={
+            <AdminRoute>
+              <Settings />
+            </AdminRoute>
+          } />
+          
+          {/* Shared routes (admin + manager) */}
           <Route path="/orders" element={
             <ProtectedRoute>
               <Orders />
             </ProtectedRoute>
           } />
           
-          <Route path="/prices" element={
+          <Route path="/my-orders" element={
             <ProtectedRoute>
-              <PriceUpload />
+              <MyOrders />
             </ProtectedRoute>
           } />
           
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={user?.role === 'manager' ? '/orders' : '/'} replace />} />
         </Routes>
       </Suspense>
       
