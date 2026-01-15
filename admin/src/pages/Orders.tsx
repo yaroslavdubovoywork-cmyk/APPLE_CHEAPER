@@ -194,6 +194,11 @@ export default function Orders() {
                       {orderDetails.telegram_username && (
                         <p className="text-blue-600">@{orderDetails.telegram_username}</p>
                       )}
+                      {orderDetails.telegram_id && orderDetails.telegram_id !== 'unknown' && (
+                        <p className="text-xs text-muted-foreground">
+                          Telegram ID: {orderDetails.telegram_id}
+                        </p>
+                      )}
                     </div>
                     
                     {orderDetails.notes && (
@@ -223,6 +228,11 @@ export default function Orders() {
                               <p className="text-sm truncate">
                                 {item.product?.name || 'Товар удалён'}
                               </p>
+                              {item.variant_name && (
+                                <p className="text-xs text-blue-600 font-medium">
+                                  Цвет: {item.variant_name}
+                                </p>
+                              )}
                               <p className="text-xs text-muted-foreground">
                                 {item.quantity} × {formatPrice(item.price)}
                               </p>
