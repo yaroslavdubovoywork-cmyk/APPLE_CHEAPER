@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Product } from '../types';
 import { useCartStore } from '../store/cartStore';
 import { useFavoritesStore } from '../store/favoritesStore';
@@ -14,6 +15,7 @@ interface ProductCardProps {
 
 export const ProductCard = memo(function ProductCard({ product, index = 0 }: ProductCardProps) {
   const { i18n, t } = useTranslation();
+  const queryClient = useQueryClient();
   const { addItem, isInCart, currency } = useCartStore();
   const { isFavorite, toggleFavorite } = useFavoritesStore();
   
@@ -46,10 +48,12 @@ export const ProductCard = memo(function ProductCard({ product, index = 0 }: Pro
     }
   };
   
-  const handleToggleFavorite = (e: React.MouseEvent) => {
+  const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    toggleFavorite(product.id);
+    await toggleFavorite(product.id);
+    // Invalidate favorites query to refresh the list
+    queryClient.invalidateQueries({ queryKey: ['favorites'] });
   };
   
   return (

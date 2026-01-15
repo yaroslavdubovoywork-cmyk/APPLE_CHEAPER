@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { useTelegram } from './hooks/useTelegram';
 import { BottomNav } from './components/BottomNav';
 import { Loading } from './components/Loading';
+import { useFavoritesStore } from './store/favoritesStore';
 
 // Lazy load pages
 const Catalog = lazy(() => import('./pages/Catalog'));
@@ -17,6 +18,7 @@ const Orders = lazy(() => import('./pages/Orders'));
 function App() {
   const { isReady, colorScheme } = useTelegram();
   const location = useLocation();
+  const loadFavorites = useFavoritesStore(state => state.loadFavorites);
   
   // Pages where BottomNav should be hidden
   const hideBottomNav = location.pathname === '/checkout';
@@ -25,6 +27,11 @@ function App() {
   useEffect(() => {
     document.body.classList.toggle('dark', colorScheme === 'dark');
   }, [colorScheme]);
+  
+  // Load favorites on app start
+  useEffect(() => {
+    loadFavorites();
+  }, [loadFavorites]);
   
   if (!isReady) {
     return <Loading fullScreen />;

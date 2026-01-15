@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productsApi, analyticsApi } from '../lib/api';
@@ -26,6 +26,7 @@ export default function Product() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { i18n, t } = useTranslation();
+  const queryClient = useQueryClient();
   const { showBackButton, hideBackButton, haptic } = useTelegram();
   
   const { addItem, isInCart, getItemQuantity, updateQuantity, removeItem, currency } = useCartStore();
@@ -125,9 +126,10 @@ export default function Product() {
     }
   };
   
-  const handleToggleFavorite = () => {
-    toggleFavorite(product.id);
+  const handleToggleFavorite = async () => {
+    await toggleFavorite(product.id);
     haptic('light');
+    queryClient.invalidateQueries({ queryKey: ['favorites'] });
     analyticsApi.trackEvent({
       event_type: favorite ? 'remove_from_favorites' : 'add_to_favorites',
       product_id: product.id

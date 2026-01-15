@@ -11,20 +11,39 @@ import { EmptyState, HeartIcon } from '../components/EmptyState';
 export default function Favorites() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const setFavorites = useFavoritesStore(state => state.setFavorites);
+  const { setFavorites, loadFavorites, isLoaded } = useFavoritesStore();
   
-  // Fetch favorites from server
-  const { data: favorites = [], isLoading } = useQuery({
+  // Load favorites on mount
+  useEffect(() => {
+    if (!isLoaded) {
+      loadFavorites();
+    }
+  }, [isLoaded, loadFavorites]);
+  
+  // Fetch favorites with products from server
+  const { data: favorites = [], isLoading, refetch } = useQuery({
     queryKey: ['favorites'],
-    queryFn: favoritesApi.getAll
+    queryFn: favoritesApi.getAll,
+    staleTime: 0, // Always refetch
   });
   
-  // Sync favorites to local store
+  // Sync favorites to local store when data changes
   useEffect(() => {
     if (favorites.length > 0) {
       setFavorites(favorites.map(f => f.product_id));
     }
   }, [favorites, setFavorites]);
+  
+  // Refetch when page becomes visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refetch]);
   
   if (isLoading) {
     return (
@@ -87,7 +106,7 @@ export default function Favorites() {
             key={favorite.id}
             product={{
               ...favorite.product,
-              price: favorite.product.price // Use current price
+              price: favorite.product.price
             }}
             index={index}
           />
