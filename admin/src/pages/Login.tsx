@@ -1,22 +1,17 @@
-import { useRef, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
-import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import toast from 'react-hot-toast';
+
+// API URL for auth
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 export default function Login() {
   const navigate = useNavigate();
   const { setAuth, isAuthenticated } = useAuthStore();
-  
-  // Use refs instead of state for form values
-  const emailRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
-  
-  const [isSetup, setIsSetup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   
   useEffect(() => {
     if (isAuthenticated) {
@@ -24,62 +19,55 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate]);
   
-  const loginMutation = useMutation({
-    mutationFn: (data: { email: string; password: string }) => 
-      authApi.login(data.email, data.password),
-    onSuccess: (data) => {
-      setAuth(data.token, data.user);
-      toast.success('Добро пожаловать!');
-      navigate('/');
-    },
-    onError: (error: Error) => {
-      setIsLoading(false);
-      if (error.message.includes('Setup')) {
-        setIsSetup(true);
-      } else {
-        toast.error(error.message || 'Ошибка входа');
-      }
-    }
-  });
-  
-  const setupMutation = useMutation({
-    mutationFn: (data: { email: string; password: string }) => 
-      authApi.setup(data.email, data.password),
-    onSuccess: (data) => {
-      setAuth(data.token, data.user);
-      toast.success('Аккаунт создан!');
-      navigate('/');
-    },
-    onError: (error: Error) => {
-      setIsLoading(false);
-      toast.error(error.message || 'Ошибка создания аккаунта');
-    }
-  });
-  
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError('');
     
-    // Get values directly from DOM refs
-    const email = emailRef.current?.value?.trim() || '';
-    const password = passwordRef.current?.value || '';
+    // Get form data directly from the form element
+    const formData = new FormData(e.currentTarget);
+    const email = (formData.get('email') as string)?.trim() || '';
+    const password = formData.get('password') as string || '';
     
-    console.log('Login attempt:', { email, passwordLength: password.length });
+    // Debug log
+    console.log('Form submitted with:', { email, passwordLength: password.length });
     
     if (!email || !password) {
+      setError('Заполните все поля');
       toast.error('Заполните все поля');
       return;
     }
     
     setIsLoading(true);
     
-    if (isSetup) {
-      setupMutation.mutate({ email, password });
-    } else {
-      loginMutation.mutate({ email, password });
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка входа');
+      }
+      
+      // Store token
+      if (data.token) {
+        localStorage.setItem('admin_token', data.token);
+      }
+      
+      setAuth(data.token, data.user);
+      toast.success('Добро пожаловать!');
+      navigate('/');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка входа';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-  const loading = isLoading || loginMutation.isPending || setupMutation.isPending;
   
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-zinc-50 to-zinc-100">
@@ -88,10 +76,7 @@ export default function Login() {
           <div className="text-5xl mb-4">🍎</div>
           <CardTitle className="text-2xl font-semibold tracking-tight">Apple Cheaper</CardTitle>
           <CardDescription className="text-base">
-            {isSetup 
-              ? 'Создайте первый аккаунт администратора' 
-              : 'Вход в панель управления'
-            }
+            Вход в панель управления
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
@@ -99,13 +84,13 @@ export default function Login() {
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-zinc-700">Email</label>
               <input
-                ref={emailRef}
                 id="email"
                 name="email"
                 type="email"
                 autoComplete="email"
                 placeholder="admin@example.com"
-                disabled={loading}
+                disabled={isLoading}
+                required
                 className="flex h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
@@ -113,31 +98,37 @@ export default function Login() {
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium text-zinc-700">Пароль</label>
               <input
-                ref={passwordRef}
                 id="password"
                 name="password"
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                disabled={loading}
+                disabled={isLoading}
+                required
                 className="flex h-11 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             
-            <Button 
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
+            
+            <button 
               type="submit" 
-              className="w-full h-11 bg-zinc-900 hover:bg-zinc-800 text-white font-medium" 
-              disabled={loading}
+              className="w-full h-11 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+              disabled={isLoading}
             >
-              {loading ? 'Загрузка...' : isSetup ? 'Создать аккаунт' : 'Войти'}
-            </Button>
+              {isLoading ? 'Загрузка...' : 'Войти'}
+            </button>
           </form>
           
-          {!isSetup && (
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Первый запуск? Введите данные и система создаст аккаунт автоматически.
-            </p>
-          )}
+          <p className="text-xs text-center text-zinc-500 mt-4">
+            Первый запуск? Введите данные и система создаст аккаунт автоматически.
+          </p>
+          
+          <p className="text-xs text-center text-zinc-400 mt-2">
+            API: {API_URL}
+          </p>
         </CardContent>
       </Card>
     </div>
