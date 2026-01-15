@@ -624,6 +624,74 @@ router.post('/:id/messages', verifyToken, async (req: Request, res: Response) =>
   }
 });
 
+// POST /api/orders/:id/notify - Send order confirmation notification (called after direct Supabase order)
+router.post('/:id/notify', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('POST /api/orders/:id/notify - Sending notification for order:', id);
+    
+    // Get order with items
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (orderError || !order) {
+      console.log('  Order not found:', id);
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    // Check if notification was already sent (check for existing message)
+    const { data: existingMessage } = await supabaseAdmin
+      .from('order_messages')
+      .select('id')
+      .eq('order_id', id)
+      .eq('direction', 'out')
+      .limit(1)
+      .single();
+    
+    if (existingMessage) {
+      console.log('  Notification already sent for this order');
+      return res.json({ success: true, already_sent: true });
+    }
+    
+    // Get order items
+    const { data: items } = await supabaseAdmin
+      .from('order_items')
+      .select('product_id, quantity, price, variant_name')
+      .eq('order_id', id);
+    
+    if (!items || items.length === 0) {
+      console.log('  No items found for order');
+      return res.status(400).json({ error: 'No items in order' });
+    }
+    
+    // Send notification to customer
+    console.log('  Sending notification to customer:', order.telegram_id);
+    try {
+      await sendOrderConfirmationToCustomer(order, items);
+      console.log('  Customer notification sent');
+    } catch (notifyError) {
+      console.error('  Failed to send customer notification:', notifyError);
+    }
+    
+    // Send notification to owner (admin)
+    try {
+      await sendOrderNotification(order, items);
+      console.log('  Owner notification sent');
+    } catch (notifyError) {
+      console.error('  Failed to send owner notification:', notifyError);
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error sending order notification:', error);
+    res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
 // GET /api/orders/managers/list - Get list of managers (admin only)
 router.get('/managers/list', verifyToken, async (req: Request, res: Response) => {
   try {

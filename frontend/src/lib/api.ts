@@ -296,6 +296,21 @@ async function createOrderDirect(data: {
   
   await supabase!.from('order_items').insert(orderItems);
   
+  // Try to send notification via backend (even for direct orders)
+  if (API_URL) {
+    try {
+      await fetch(`${API_URL}/orders/${order.id}/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Telegram-Init-Data': window.Telegram?.WebApp?.initData || ''
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to send order notification:', e);
+    }
+  }
+  
   return order;
 }
 
