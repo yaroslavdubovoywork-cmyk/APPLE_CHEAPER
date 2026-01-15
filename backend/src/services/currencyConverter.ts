@@ -30,12 +30,12 @@ async function fetchRates(): Promise<CurrencyRates> {
       throw new Error('Failed to fetch rates');
     }
     
-    const data = await response.json();
+    const data = await response.json() as { conversion_rates: { USD?: number; EUR?: number } };
     
     return {
       RUB: 1,
-      USD: data.conversion_rates.USD || DEFAULT_RATES.USD,
-      EUR: data.conversion_rates.EUR || DEFAULT_RATES.EUR,
+      USD: data.conversion_rates?.USD || DEFAULT_RATES.USD,
+      EUR: data.conversion_rates?.EUR || DEFAULT_RATES.EUR,
       updated_at: new Date().toISOString()
     };
   } catch (error) {

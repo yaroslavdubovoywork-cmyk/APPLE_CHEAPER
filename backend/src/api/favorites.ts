@@ -35,7 +35,10 @@ router.get('/', verifyTelegramWebApp, async (req: Request, res: Response) => {
     if (error) throw error;
     
     // Filter out inactive products
-    const activeFavorites = data?.filter(f => f.product?.is_active) || [];
+    const activeFavorites = data?.filter(f => {
+      const product = f.product as { is_active?: boolean } | null;
+      return product?.is_active;
+    }) || [];
     
     res.json(activeFavorites);
   } catch (error) {
