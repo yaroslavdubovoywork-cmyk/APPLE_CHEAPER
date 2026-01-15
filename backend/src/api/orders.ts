@@ -530,17 +530,15 @@ router.post('/:id/assign', verifyToken, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/orders/:id/messages - Get chat messages for order
+// GET /api/orders/:id/messages - Get chat messages for customer (all messages by telegram_id)
 router.get('/:id/messages', verifyToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.user?.userId;
-    const userRole = req.user?.role;
     
-    // Get order to check permission
+    // Get order to find telegram_id
     const { data: order } = await supabaseAdmin
       .from('orders')
-      .select('assigned_manager_id')
+      .select('telegram_id')
       .eq('id', id)
       .single();
     
@@ -548,18 +546,15 @@ router.get('/:id/messages', verifyToken, async (req: Request, res: Response) => 
       return res.status(404).json({ error: 'Order not found' });
     }
     
-    // Admin can see all, manager can only see assigned orders
-    if (userRole !== 'admin' && order.assigned_manager_id !== userId) {
-      return res.status(403).json({ error: 'Нет доступа к сообщениям этого заказа' });
-    }
-    
+    // Get ALL messages from this customer (by telegram_id), not just for this order
     const { data: messages, error } = await supabaseAdmin
       .from('order_messages')
       .select(`
         *,
-        admin:admin_users!order_messages_created_by_admin_id_fkey(id, email)
+        admin:admin_users!order_messages_created_by_admin_id_fkey(id, email),
+        order:orders!order_messages_order_id_fkey(id, created_at, total)
       `)
-      .eq('order_id', id)
+      .eq('telegram_chat_id', order.telegram_id)
       .order('created_at', { ascending: true });
     
     if (error) throw error;

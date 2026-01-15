@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ShoppingCart, Eye, Package, MessageCircle, Send } from 'lucide-react';
+import { ShoppingCart, Eye, Package, MessageCircle, Send, History } from 'lucide-react';
 import { ordersApi } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -58,13 +59,45 @@ export default function MyOrders() {
     enabled: !!selectedOrder
   });
   
-  // Fetch messages
-  const { data: messages, isLoading: messagesLoading } = useQuery({
+  // Fetch messages (all messages from this customer)
+  const { data: messages, isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
     queryKey: ['order-messages', selectedOrder?.id],
     queryFn: () => ordersApi.getMessages(selectedOrder.id),
-    enabled: !!selectedOrder,
-    refetchInterval: 5000 // Poll every 5 seconds
+    enabled: !!selectedOrder
   });
+  
+  // Ref for auto-scroll
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Real-time subscription for new messages
+  useEffect(() => {
+    if (!orderDetails?.telegram_id) return;
+    
+    const channel = supabase
+      .channel(`my-messages-${orderDetails.telegram_id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'order_messages',
+          filter: `telegram_chat_id=eq.${orderDetails.telegram_id}`
+        },
+        () => {
+          refetchMessages();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderDetails?.telegram_id, refetchMessages]);
+  
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
   
   // Update status
   const updateStatusMutation = useMutation({
@@ -308,46 +341,81 @@ export default function MyOrders() {
                 </CardContent>
               </Card>
               
-              {/* Chat */}
+              {/* Chat with customer - shows ALL messages from this telegram_id */}
               <Card>
                 <CardContent className="p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <MessageCircle className="w-5 h-5" />
-                    <h4 className="font-semibold">Чат с клиентом</h4>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="w-5 h-5" />
+                      <h4 className="font-semibold">Чат с клиентом</h4>
+                      {orderDetails?.telegram_username && (
+                        <span className="text-sm text-blue-600">@{orderDetails.telegram_username}</span>
+                      )}
+                    </div>
+                    {messages && messages.length > 0 && (
+                      <Badge variant="outline" className="gap-1">
+                        <History className="w-3 h-3" />
+                        {messages.length} сообщений
+                      </Badge>
+                    )}
                   </div>
                   
                   {/* Messages */}
-                  <div className="h-64 overflow-y-auto border rounded-lg p-3 mb-4 space-y-3 bg-muted/30">
+                  <div className="h-80 overflow-y-auto border rounded-lg p-3 mb-4 space-y-3 bg-muted/30">
                     {messagesLoading ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full" />
                       </div>
                     ) : messages && messages.length > 0 ? (
-                      messages.map((msg: any) => (
-                        <div
-                          key={msg.id}
-                          className={cn(
-                            "max-w-[80%] p-3 rounded-lg",
-                            msg.direction === 'out'
-                              ? "ml-auto bg-primary text-primary-foreground"
-                              : "bg-card border"
-                          )}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                          <p className={cn(
-                            "text-xs mt-1",
-                            msg.direction === 'out' ? "text-primary-foreground/70" : "text-muted-foreground"
-                          )}>
-                            {new Date(msg.created_at).toLocaleString('ru-RU')}
-                            {msg.direction === 'out' && msg.admin?.email && (
-                              <span className="ml-2">• {msg.admin.email}</span>
-                            )}
-                          </p>
-                        </div>
-                      ))
+                      <>
+                        {messages.map((msg: any, index: number) => {
+                          const prevMsg = index > 0 ? messages[index - 1] : null;
+                          const showOrderSeparator = prevMsg && prevMsg.order_id !== msg.order_id;
+                          
+                          return (
+                            <div key={msg.id}>
+                              {showOrderSeparator && (
+                                <div className="flex items-center gap-2 my-4">
+                                  <div className="flex-1 border-t border-dashed" />
+                                  <span className="text-xs text-muted-foreground px-2">
+                                    Заказ #{msg.order?.id?.slice(0, 8) || msg.order_id?.slice(0, 8)}
+                                  </span>
+                                  <div className="flex-1 border-t border-dashed" />
+                                </div>
+                              )}
+                              
+                              <div
+                                className={cn(
+                                  "max-w-[80%] p-3 rounded-lg",
+                                  msg.direction === 'out'
+                                    ? "ml-auto bg-primary text-primary-foreground"
+                                    : "bg-card border"
+                                )}
+                              >
+                                <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                                <div className={cn(
+                                  "text-xs mt-1 flex items-center gap-2 flex-wrap",
+                                  msg.direction === 'out' ? "text-primary-foreground/70" : "text-muted-foreground"
+                                )}>
+                                  <span>{new Date(msg.created_at).toLocaleString('ru-RU')}</span>
+                                  {msg.direction === 'out' && msg.admin?.email && (
+                                    <span>• {msg.admin.email.split('@')[0]}</span>
+                                  )}
+                                  {msg.order_id !== selectedOrder?.id && (
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1">
+                                      #{msg.order_id?.slice(0, 6)}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div ref={messagesEndRef} />
+                      </>
                     ) : (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Нет сообщений
+                        Нет сообщений с этим клиентом
                       </div>
                     )}
                   </div>
